@@ -33,54 +33,48 @@ export function Nav() {
 
   return (
     <motion.header
-      initial={{ y: -16, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.8, ease: EASE }}
       className={cx(
-        "fixed inset-x-0 top-0 z-50 h-14 border-b transition-[background-color,border-color,backdrop-filter] duration-300",
-        scrolled || open ? "border-line bg-bg/80 backdrop-blur-xl" : "border-transparent bg-transparent",
+        "fixed inset-x-0 top-0 z-50 h-[73px] border-b transition-[background-color,border-color] duration-300",
+        scrolled || open ? "border-line bg-bg/75 backdrop-blur-xl backdrop-saturate-150" : "border-transparent",
       )}
     >
       <Container className="flex h-full items-center justify-between">
-        <a href="#top" aria-label="IGNIS home">
-          <Wordmark />
+        <a href="#top" aria-label="IGNIS home" className="-ml-1 flex h-8 items-center px-1">
+          <Wordmark height={19} />
         </a>
 
-        <nav aria-label="Sections" className="hidden md:block">
-          <ul className="flex items-center gap-1">
-            {nav.map((item) => (
-              <li key={item.id} className="relative">
-                <a
-                  href={`#${item.id}`}
-                  className={cx(
-                    "relative z-10 block rounded-full px-3 py-1.5 text-[13px] transition-colors",
-                    active === item.id ? "text-fg" : "text-fg-3 hover:text-fg",
-                  )}
-                >
-                  {item.label}
-                </a>
-                {active === item.id && (
-                  <motion.span
-                    layoutId="nav-pill"
-                    className="absolute inset-0 rounded-full bg-white/[0.07]"
-                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <div className="hidden items-center gap-2 md:flex">
-          <ButtonLink href="#/app" variant="ghost">
-            Workspace preview
-          </ButtonLink>
-          <ButtonLink href={REPO} variant="secondary" external>
-            <Icon name="github" size={14} /> GitHub
-          </ButtonLink>
-          {demoUrl && (
-            <ButtonLink href={demoUrl} external>
+        <div className="hidden items-center md:flex">
+          <nav aria-label="Sections">
+            <ul className="flex items-center">
+              {nav.map((item) => (
+                <li key={item.id}>
+                  <a
+                    href={`#${item.id}`}
+                    className={cx(
+                      "block px-3 py-1.5 text-[13px] tracking-normal transition-colors duration-150",
+                      active === item.id ? "text-fg" : "text-fg-3 hover:text-fg",
+                    )}
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <span aria-hidden className="mx-4 h-4 w-px bg-line-strong" />
+          <a href="#/app" className="px-3 py-1.5 text-[13px] tracking-normal text-fg-3 transition-colors hover:text-fg">
+            Workspace
+          </a>
+          {demoUrl ? (
+            <ButtonLink href={demoUrl} external variant="light" className="ml-2">
               View demo
+            </ButtonLink>
+          ) : (
+            <ButtonLink href={REPO} external variant="light" className="ml-2">
+              GitHub
             </ButtonLink>
           )}
         </div>
@@ -107,19 +101,11 @@ export function Nav() {
             className="border-b border-line bg-bg/95 backdrop-blur-xl md:hidden"
           >
             <Container className="flex flex-col py-3">
-              {nav.map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  onClick={() => setOpen(false)}
-                  className="py-2.5 text-[15px] text-fg-2 hover:text-fg"
-                >
-                  {item.label}
+              {[...nav.map((n) => ({ href: `#${n.id}`, label: n.label })), { href: "#/app", label: "Workspace" }].map((l) => (
+                <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="py-2.5 text-[15px] text-fg-2 hover:text-fg">
+                  {l.label}
                 </a>
               ))}
-              <a href="#/app" className="py-2.5 text-[15px] text-fg-2 hover:text-fg">
-                Workspace preview
-              </a>
               <a href={REPO} target="_blank" rel="noreferrer" className="py-2.5 text-[15px] text-fg-2 hover:text-fg">
                 GitHub
               </a>

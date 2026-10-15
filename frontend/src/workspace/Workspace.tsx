@@ -23,7 +23,7 @@ const STAGES = ["Source", "Mapping", "Review", "Facts", "Evidence", "Report"] as
 
 export type Decision = { state: RecordState; reason: string; revision: number };
 
-export function Workspace() {
+export function Workspace({ embedded = false }: { embedded?: boolean }) {
   const [stage, setStage] = useState(0);
   const [direction, setDirection] = useState(1);
   const [mappingConfirmed, setMappingConfirmed] = useState(false);
@@ -88,13 +88,13 @@ export function Workspace() {
   ];
 
   return (
-    <div className="flex h-dvh flex-col bg-bg text-fg">
+    <div className={cx("relative flex flex-col bg-bg text-fg", embedded ? "h-full" : "h-dvh")}>
       {/* Top bar */}
       <header className="border-b border-line bg-elevated">
         <div className="flex h-12 items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <a href="#/" aria-label="Back to landing page">
-              <Wordmark />
+            <a href="#/" aria-label="Back to landing page" className="flex items-center">
+              <Wordmark height={15} />
             </a>
             <span className="hidden truncate text-[13px] text-fg-3 sm:inline">Maintenance evidence workspace</span>
           </div>
@@ -213,7 +213,7 @@ export function Workspace() {
           {drawer && (
             <>
               <motion.div
-                className="fixed inset-0 z-40 bg-black/50 xl:hidden"
+                className={cx(embedded ? "absolute" : "fixed", "inset-0 z-40 bg-black/50 xl:hidden")}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -222,7 +222,7 @@ export function Workspace() {
               <motion.aside
                 role="dialog"
                 aria-label="Evidence inspector"
-                className="fixed inset-y-0 right-0 z-50 w-[min(360px,92vw)] border-l border-line bg-elevated shadow-2xl xl:hidden"
+                className={cx(embedded ? "absolute" : "fixed", "inset-y-0 right-0 z-50 w-[min(360px,92vw)] border-l border-line bg-elevated shadow-2xl xl:hidden")}
                 initial={{ x: "100%" }}
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
@@ -258,7 +258,7 @@ export function Workspace() {
 function StageDot({ status, index }: { status: StageStatus; index: number }) {
   const map: Record<StageStatus, { cls: string; t: Tone }> = {
     done: { cls: "border-ok/50 bg-ok/15 text-ok", t: "ok" },
-    active: { cls: "border-accent text-accent", t: "accent" },
+    active: { cls: "border-accent text-brand-text", t: "accent" },
     todo: { cls: "border-line-strong text-fg-3", t: "plain" },
     blocked: { cls: "border-dashed border-line-strong text-fg-4", t: "neutral" },
   };

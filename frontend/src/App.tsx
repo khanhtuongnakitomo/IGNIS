@@ -3,7 +3,8 @@ import { MotionConfig } from "motion/react";
 import { Nav } from "./components/landing/Nav";
 import { Hero } from "./components/landing/Hero";
 import { Challenge, Features, Product, Track } from "./components/landing/Story";
-import { Comparison, Delivered, Footer, ProductFrame, Sources, Team } from "./components/landing/Proof";
+import { Closing, Comparison, Delivered, Footer, ProductFrame, Sources, Team } from "./components/landing/Proof";
+import { Figures, Statement, Strip } from "./components/landing/Intro";
 import { Workspace } from "./workspace/Workspace";
 
 // Hash routing keeps the build static: "#/app" is the workspace, anything else the landing page.
@@ -24,6 +25,9 @@ function Landing() {
       <Nav />
       <main>
         <Hero />
+        <Strip />
+        <Statement />
+        <Figures />
         <Challenge />
         <Track />
         <Product />
@@ -33,6 +37,7 @@ function Landing() {
         <Comparison />
         <Team />
         <Sources />
+        <Closing />
       </main>
       <Footer />
     </>

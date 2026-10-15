@@ -75,7 +75,7 @@ function Btn({
       whileTap={disabled ? undefined : { scale: 0.97 }}
       className={cx(
         "inline-flex h-8 items-center gap-1.5 rounded-[var(--radius)] px-3 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-        variant === "primary" && "bg-accent text-white hover:bg-accent-hover",
+        variant === "primary" && "bg-accent text-on-brand hover:bg-accent-hover",
         variant === "secondary" && "border border-line-strong text-fg hover:bg-hover",
         variant === "danger" && "border border-danger/40 text-danger hover:bg-danger/10",
       )}
@@ -102,7 +102,7 @@ function IdChip({ id, kind, select }: { id: string; kind: NonNullable<Selection>
     <button
       type="button"
       onClick={() => select({ kind, id })}
-      className="rounded-[4px] border border-line-strong bg-bg px-1.5 py-px font-mono text-[11px] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+      className="rounded-[4px] border border-line-strong bg-bg px-1.5 py-px font-mono text-[11px] text-fg-2 transition-colors hover:border-accent/50 hover:text-brand-text"
     >
       {id}
     </button>
@@ -552,7 +552,7 @@ export function FactsScreen({
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" />
               <span className="relative inline-flex size-2 rounded-full bg-accent" />
             </span>
-            <span className="font-mono text-[12px] text-accent">{alert.id}</span>
+            <span className="font-mono text-[12px] text-brand-text">{alert.id}</span>
             <span className="text-[13px] font-medium text-fg">
               {alert.kind} · {alert.component}
             </span>

@@ -1,6 +1,6 @@
 # IGNIS design system and workspace UI
 
-**Status:** proposed design for the frontend mission in [issue #19](https://github.com/khanhtuongnakitomo/IGNIS/issues/19). No frontend is implemented yet. The landing page has its own spec: [LANDING_PAGE.md](LANDING_PAGE.md).
+**Status:** design for the frontend mission in [issue #19](https://github.com/khanhtuongnakitomo/IGNIS/issues/19). A landing page and a mock-data workspace preview exist in [frontend/](../../frontend/README.md); nothing is connected to the backend yet. The landing page has its own spec: [LANDING_PAGE.md](LANDING_PAGE.md).
 
 **Reference:** the visual language follows [linear.app](https://linear.app): dark, quiet, dense, precise. IGNIS takes the structure, not the brand. It uses no Linear assets, logos or copy.
 
@@ -11,8 +11,8 @@
 | Name | **IGNIS** (Latin for *fire*). Write it in capitals in the wordmark and as "IGNIS" in text |
 | One-liner | Traceable maintenance work-order intelligence with checked reporting |
 | Voice | Plain, exact, unhyped. State what the system computed, what the model proposed and what a person approved |
-| Personality | An evidence desk, not an oracle. The calm comes from monochrome; one ember accent marks attention |
-| Logo | Text wordmark `IGNIS` at weight 600, letter-spacing `0.08em`. Optional mark: a 16 px rounded square (`--radius-sm`) filled with `--accent`. No flame illustration or gradient logo |
+| Personality | An evidence desk, not an oracle. The calm comes from black; one yellow accent marks attention |
+| Logo | Brand kit in `frontend/public/brand`: wordmark and flame-i mark (the dot of the **i** is a flame). Use the SVGs; never retype IGNIS in a font. Minimum wordmark width 72px; the flame is always `#FFC400` |
 
 **Words to avoid:** "predicts failures", "AI-powered diagnosis", "autonomous", "real-time factory", or any savings or percentage figure that was not measured.
 
@@ -30,50 +30,48 @@ Use dark by default. A light theme comes later and reuses the same token names.
 
 ```css
 :root {
-  /* Surfaces: near-black, layered by lightness, not by shadow */
-  --bg:            #08090a;  /* page */
-  --bg-elevated:   #0f1011;  /* sidebar, panels */
-  --bg-card:       #141516;  /* cards, table rows on hover */
-  --bg-hover:      #1c1d1f;
+  /* Surfaces: brand surface-0 (#0B0B0C) and surface-1 (#18181A), two steps between */
+  --bg:            #0b0b0c;  /* page */
+  --bg-elevated:   #111113;  /* sidebar, panels */
+  --bg-card:       #18181a;  /* cards */
+  --bg-hover:      #1f1f22;
   --border:        rgba(255,255,255,0.08);
   --border-strong: rgba(255,255,255,0.14);
 
-  /* Text */
-  --text:          #f7f8f8;  /* primary */
-  --text-2:        #b4b8bf;  /* body */
-  --text-3:        #8a8f98;  /* secondary, labels */
-  --text-4:        #62666d;  /* disabled, hints */
+  /* Ink */
+  --text:          #f5f4f2;  /* primary */
+  --text-2:        #d0d0d4;  /* body, leads */
+  --text-3:        #a1a1a8;  /* secondary (brand ink-muted) */
+  --text-4:        #6b6b72;  /* hints, mono labels */
 
-  /* Brand: ember, used sparingly (primary action, focus, one highlight per view) */
-  --accent:        #f2643a;
-  --accent-hover:  #ff7a52;
-  --accent-soft:   rgba(242,100,58,0.12);
+  /* Brand yellow: a fill, one primary per screen */
+  --accent:        #ffc400;
+  --accent-hover:  #ffd233;
+  --accent-soft:   rgba(255,196,0,0.10);
+  --on-brand:      #0b0b0c;  /* text on yellow, never white */
+  --brand-text:    #ffd54a;  /* yellow used as text on dark */
 
   /* Semantic: always paired with a text label */
   --ok:            #4cb782;  /* approved, passed */
-  --warn:          #f2c94c;  /* pending, stale, rate-limited */
+  --warn:          #f2994a;  /* pending, stale, rate-limited */
   --danger:        #eb5757;  /* rejected, failed, invalid */
   --info:          #5e9eff;  /* live API */
-  --neutral:       #8a8f98;  /* inconclusive, replay */
+  --neutral:       #a1a1a8;  /* inconclusive, replay */
   --synthetic:     #b48cff;  /* synthetic fields */
 
-  /* Type */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto,
-               "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-               "Liberation Mono", monospace;
+  /* Type: Linear's fallback chain without loading a web font */
+  --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, system-ui,
+               "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Shape and spacing (4 px grid) */
   --radius-sm: 4px; --radius: 8px; --radius-lg: 12px; --radius-pill: 999px;
-  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
-  --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px; --space-24: 96px;
-
-  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
-  --dur-fast: 120ms; --dur: 200ms;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 ```
 
-Contrast: `--text` through `--text-3` on `--bg` meet WCAG AA for body text. Use `--text-4` only for non-essential hints.
+Contrast: `--text` through `--text-3` on `--bg` meet WCAG AA for body text. Use `--text-4` only for non-essential hints. Yellow as text uses `--brand-text`.
+
+**Landing type scale (measured on linear.app):** display 64/64 weight 510, tracking −0.022em; section titles 48/48 weight 510; leads 24/32; body 15/24 in `--text-3`; nav 13px; mono labels 12px uppercase in `--text-4`. Content edge sits at x=80 on a 1440px viewport.
 
 ## 4. Typography
 

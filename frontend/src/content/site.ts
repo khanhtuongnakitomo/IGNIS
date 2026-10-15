@@ -16,11 +16,41 @@ export const nav = [
 ] as const;
 
 export const hero = {
-  pill: "AMD Developer Hackathon · ACT III · Track 1",
-  headline: "Maintenance history you can trace.",
+  headline: ["The evidence system for", "maintenance teams and AI"],
   subhead:
-    "IGNIS turns messy maintenance work orders into human-reviewed records, code-computed priorities and cited explanations, then issues a report where every number links back to its source.",
+    "Purpose-built for turning messy work orders into reviewed records, code-computed priorities and cited reports.",
+  badge: "ACT III",
+  badgeLink: "AMD Developer Hackathon",
 };
+
+/** Text strip under the hero, in place of customer logos. Facts about the event, not endorsements. */
+export const strip = {
+  caption: "Built for AMD Developer Hackathon ACT III · Track 1 Intelligent Industry",
+  items: ["AMD ACT III", "Track 1", "$17,000+ pool", "12–18 Oct 2026", "lablab.ai", "MaintIE"],
+};
+
+export const statement = {
+  lead: "An evidence desk for maintenance.",
+  rest: "Models propose, code computes and people approve, so every claim in the final report resolves to a fact, a passage and an original record.",
+};
+
+export const pillars = [
+  {
+    fig: "FIG 0.1",
+    title: "Models propose",
+    body: "A hosted AMD model suggests components, faults and actions as spans of the original text. Suggestions stay pending.",
+  },
+  {
+    fig: "FIG 0.2",
+    title: "Code computes",
+    body: "Counts, priority bands and alerts come from versioned rules over the approved snapshot, never from model prose.",
+  },
+  {
+    fig: "FIG 0.3",
+    title: "People approve",
+    body: "Reviewers accept, correct or reject each record, and an expert signs off the finding before any report is issued.",
+  },
+];
 
 export const challenge = {
   intro:

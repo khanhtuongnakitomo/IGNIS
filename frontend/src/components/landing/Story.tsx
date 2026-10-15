@@ -22,7 +22,7 @@ export function Challenge() {
               i === 2 && "lg:border-r",
             )}
           >
-            <div className="text-[28px] leading-none font-semibold tracking-[-0.03em] text-fg sm:text-[40px] lg:text-[48px]">
+            <div className="text-[28px] leading-none font-[510] tracking-[-0.03em] text-fg sm:text-[40px] lg:text-[48px]">
               {"prefix" in s && s.prefix}
               <CountUp value={s.value} />
               {"suffix" in s && <span className="text-fg-3">{s.suffix}</span>}
@@ -81,7 +81,7 @@ export function Track() {
         {track.problems.map((p, i) => (
           <StaggerItem key={p.title} className="rounded-[var(--radius-lg)] border border-line bg-elevated p-6">
             <div className="font-mono text-[11px] text-fg-4">0{i + 1}</div>
-            <h3 className="mt-3 text-[15px] font-semibold text-fg">{p.title}</h3>
+            <h3 className="mt-3 text-[15px] font-[510] text-fg">{p.title}</h3>
             <p className="mt-2 text-[14px] leading-relaxed text-fg-2">{p.body}</p>
           </StaggerItem>
         ))}
@@ -92,8 +92,14 @@ export function Track() {
 
 function CoverageChart() {
   return (
-    <ul className="space-y-2.5">
-      {track.coverage.map((row, i) => (
+    <motion.ul
+      className="space-y-2.5"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ staggerChildren: 0.09, delayChildren: 0.15 }}
+    >
+      {track.coverage.map((row) => (
         <li key={row.source} className="grid grid-cols-[132px_1fr] items-center gap-3 sm:grid-cols-[160px_1fr]">
           <span className={cx("text-[13px]", row.status === "out" ? "text-fg-4" : "text-fg-2")}>{row.source}</span>
           <div className="relative h-8 overflow-hidden rounded-[6px] border border-line">
@@ -101,20 +107,17 @@ function CoverageChart() {
               aria-hidden
               className={cx(
                 "absolute inset-y-0 left-0 origin-left",
-                row.status === "now" && "bg-gradient-to-r from-accent/80 to-accent/40",
+                row.status === "now" && "bg-accent",
                 row.status === "roadmap" &&
                   "bg-[repeating-linear-gradient(135deg,rgb(255_255_255/0.06)_0_6px,transparent_6px_12px)]",
               )}
               style={{ width: row.status === "out" ? "0%" : "100%" }}
-              initial={{ scaleX: 0 }}
-              whileInView={{ scaleX: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1.1, ease: EASE, delay: 0.15 + i * 0.09 }}
+              variants={{ hidden: { scaleX: 0 }, show: { scaleX: 1, transition: { duration: 1.1, ease: EASE } } }}
             />
             <span
               className={cx(
                 "relative flex h-full items-center px-3 text-[12px] font-medium",
-                row.status === "now" ? "text-white" : row.status === "roadmap" ? "text-fg-2" : "text-fg-4",
+                row.status === "now" ? "text-on-brand" : row.status === "roadmap" ? "text-fg-2" : "text-fg-4",
               )}
             >
               {row.note}
@@ -122,7 +125,7 @@ function CoverageChart() {
           </div>
         </li>
       ))}
-    </ul>
+    </motion.ul>
   );
 }
 
@@ -131,7 +134,7 @@ function CoverageChart() {
 const ownerStyle: Record<Owner, string> = {
   AI: "text-fg-3 border-line-strong",
   CODE: "text-fg-3 border-line-strong",
-  HUMAN: "text-accent border-accent/40",
+  HUMAN: "text-brand-text border-accent/40",
 };
 
 /** A packet of evidence travels the flow; each node lights up as it passes. */
@@ -163,7 +166,7 @@ function FlowDiagram() {
         {!reduce && (
           <motion.span style={{ left }} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2">
             <span className="block h-px w-24 -translate-x-1/2 bg-gradient-to-r from-transparent via-accent to-transparent" />
-            <span className="absolute top-1/2 left-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-[0_0_14px_4px_rgb(242_100_58/0.6)]" />
+            <span className="absolute top-1/2 left-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-[0_0_14px_4px_rgb(255_196_0/0.6)]" />
           </motion.span>
         )}
       </div>
@@ -172,7 +175,7 @@ function FlowDiagram() {
         {!reduce && (
           <motion.span
             style={{ top }}
-            className="absolute left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-[0_0_14px_4px_rgb(242_100_58/0.6)]"
+            className="absolute left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-[0_0_14px_4px_rgb(255_196_0/0.6)]"
           />
         )}
       </div>
@@ -186,7 +189,7 @@ function FlowDiagram() {
                 aria-hidden
                 className={cx(
                   "relative z-10 grid size-10 shrink-0 place-items-center rounded-full border bg-bg font-mono text-[11px] transition-colors duration-500 lg:hidden",
-                  lit ? "border-accent text-accent" : "border-line-strong text-fg-3",
+                  lit ? "border-accent text-brand-text" : "border-line-strong text-fg-3",
                 )}
               >
                 {i + 1}
@@ -195,7 +198,7 @@ function FlowDiagram() {
                 className={cx(
                   "relative z-10 flex-1 rounded-[var(--radius)] border bg-elevated px-3 py-3.5 transition-[border-color,box-shadow,background-color] duration-500 lg:min-h-[104px]",
                   lit && !reduce
-                    ? "border-accent/60 bg-card shadow-[0_0_0_4px_rgb(242_100_58/0.08),0_12px_32px_-12px_rgb(242_100_58/0.5)]"
+                    ? "border-accent/60 bg-card shadow-[0_0_0_4px_rgb(255_196_0/0.08),0_12px_32px_-12px_rgb(255_196_0/0.5)]"
                     : "border-line",
                 )}
               >
@@ -231,7 +234,7 @@ export function Product() {
           <span className="rounded-[4px] border border-line-strong px-1.5 font-mono text-[10px]">CODE</span> computes
         </span>
         <span className="flex items-center gap-2">
-          <span className="rounded-[4px] border border-accent/40 px-1.5 font-mono text-[10px] text-accent">HUMAN</span>{" "}
+          <span className="rounded-[4px] border border-accent/40 px-1.5 font-mono text-[10px] text-brand-text">HUMAN</span>{" "}
           approves
         </span>
       </Reveal>
@@ -264,10 +267,10 @@ export function Features() {
               onPointerMove={trackSpotlight}
               className="spotlight group relative h-full overflow-hidden rounded-[var(--radius-lg)] border border-line bg-elevated p-6 transition-colors duration-300 hover:bg-card"
             >
-              <div className="relative grid size-9 place-items-center rounded-[var(--radius)] border border-line-strong bg-bg text-fg-2 transition-colors duration-300 group-hover:border-accent/50 group-hover:text-accent">
+              <div className="relative grid size-9 place-items-center rounded-[var(--radius)] border border-line-strong bg-bg text-fg-2 transition-colors duration-300 group-hover:border-accent/50 group-hover:text-brand-text">
                 <Icon name={f.icon} />
               </div>
-              <h3 className="relative mt-5 text-[15px] font-semibold text-fg">{f.title}</h3>
+              <h3 className="relative mt-5 text-[15px] font-[510] text-fg">{f.title}</h3>
               <p className="relative mt-2 text-[14px] leading-relaxed text-fg-2">{f.body}</p>
             </article>
           </StaggerItem>

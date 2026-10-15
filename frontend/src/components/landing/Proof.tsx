@@ -13,61 +13,52 @@ import {
 } from "../../content/site";
 import { Icon } from "../ui/icons";
 import { CountUp, EASE, Reveal, Stagger, StaggerItem, trackSpotlight } from "../ui/motion";
-import { Container, cx, Section, Wordmark } from "../ui/primitives";
+import { ButtonLink, Container, cx, Section, Wordmark } from "../ui/primitives";
+import { Workspace } from "../../workspace/Workspace";
 
-/* 04 — Product frame: tilts upright as it scrolls into view ----------------- */
+/* 04 — Inside IGNIS: the real workspace preview, embedded and interactive ---- */
 
 export function ProductFrame() {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "center center"] });
-  const rotateX = useTransform(scrollYProgress, [0, 1], [reduce ? 0 : 24, 0]);
-  const scale = useTransform(scrollYProgress, [0, 1], [reduce ? 1 : 0.9, 1]);
-  const opacity = useTransform(scrollYProgress, [0, 0.6], [reduce ? 1 : 0.35, 1]);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "start 30%"] });
+  const rotateX = useTransform(scrollYProgress, [0, 1], [reduce ? 0 : 18, 0]);
+  const scale = useTransform(scrollYProgress, [0, 1], [reduce ? 1 : 0.94, 1]);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [reduce ? 1 : 0.4, 1]);
 
   return (
-    <Section eyebrow="04 — Inside IGNIS" title="The review workspace">
-      <div ref={ref} style={{ perspective: 1400 }} className="relative">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -inset-x-10 -top-16 h-56 bg-[radial-gradient(closest-side,rgb(242_100_58/0.16),transparent)] blur-2xl"
-        />
-        <motion.figure
-          style={{ rotateX, scale, opacity, transformOrigin: "50% 100%" }}
-          className="relative overflow-hidden rounded-[var(--radius-lg)] border border-line-strong bg-elevated shadow-[0_60px_140px_-50px_rgb(0_0_0/1)]"
+    <Section
+      eyebrow="04 — Inside IGNIS"
+      title="The review workspace"
+      intro="Six stages from source file to signed report. Try it below: confirm the mapping, review records and sign off a finding. Mock data, clearly labelled."
+    >
+      <div ref={ref} style={{ perspective: 1600 }}>
+        <motion.div
+          style={{ rotateX, scale, opacity, transformOrigin: "50% 0%" }}
+          className="rounded-[12px] bg-[#0d0d0e] p-2 shadow-[0_0_0_1px_rgb(255_255_255/0.04),0_60px_140px_-40px_rgb(0_0_0/1)]"
         >
-          <div className="flex h-9 items-center gap-1.5 border-b border-line px-3.5">
-            <span className="size-2 rounded-full bg-fg-4/70" />
-            <span className="size-2 rounded-full bg-fg-4/70" />
-            <span className="size-2 rounded-full bg-fg-4/70" />
-          </div>
-          <div className="relative aspect-[16/10] w-full">
+          <div className="relative overflow-hidden rounded-[10px] border border-line">
             {productScreenshot ? (
-              <img
-                src={productScreenshot.src}
-                alt="IGNIS review workspace"
-                className="absolute inset-0 size-full object-cover object-top"
-              />
+              <img src={productScreenshot.src} alt="IGNIS review workspace" className="block w-full" />
             ) : (
-              <div className="absolute inset-0 grid place-items-center">
-                <div aria-hidden className="grid-bg absolute inset-0 [mask-image:none] opacity-60" />
-                <div className="relative text-center">
-                  <p className="font-mono text-[12px] text-fg-3">Product screenshot — added after integration</p>
-                  <a
-                    href="#/app"
-                    className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-fg-2 hover:text-fg"
-                  >
-                    Open the workspace design preview <Icon name="arrow" size={12} />
-                  </a>
+              <>
+                <div className="hidden h-[760px] md:block">
+                  <Workspace embedded />
                 </div>
-              </div>
+                <a
+                  href="#/app"
+                  className="flex items-center justify-between gap-4 bg-elevated p-5 text-[14px] text-fg-2 md:hidden"
+                >
+                  Open the workspace preview <Icon name="arrow" size={14} />
+                </a>
+              </>
             )}
           </div>
-        </motion.figure>
-        <p className="mt-4 text-center font-mono text-[11px] text-fg-4">
-          {productScreenshot ? productScreenshot.caption : "Screenshot from <commit / run id>, <LIVE | REPLAY> mode"}
-        </p>
+        </motion.div>
       </div>
+      <p className="mt-4 font-mono text-[11px] text-fg-4">
+        {productScreenshot ? productScreenshot.caption : "Design preview · mock data · not connected to the backend or the AMD API"}
+      </p>
     </Section>
   );
 }
@@ -106,8 +97,8 @@ function SplitVisual() {
             key={d.name}
             className={cx("h-full origin-left", colors[i])}
             style={{ width: `${(d.count / total) * 100}%` }}
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
+            initial={{ clipPath: "inset(0 100% 0 0)" }}
+            whileInView={{ clipPath: "inset(0 0% 0 0)" }}
             viewport={{ once: true }}
             transition={{ duration: 0.9, ease: EASE, delay: 0.3 + i * 0.25 }}
           />
@@ -134,7 +125,7 @@ export function Delivered() {
               onPointerMove={trackSpotlight}
               className="spotlight relative flex h-full flex-col rounded-[var(--radius-lg)] border border-line bg-elevated p-6"
             >
-              <div className="relative text-[44px] leading-none font-semibold tracking-[-0.035em] text-fg">
+              <div className="relative text-[44px] leading-none font-[510] tracking-[-0.035em] text-fg">
                 <CountUp value={m.value} />
                 {"secondary" in m && (
                   <>
@@ -161,7 +152,7 @@ export function Delivered() {
       <Reveal delay={0.1} className="mt-8">
         <div className="rounded-[var(--radius-lg)] border border-dashed border-line-strong p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-[15px] font-semibold text-fg">Model benchmarks on AMD Token Factory</h3>
+            <h3 className="text-[15px] font-[510] text-fg">Model benchmarks on AMD Token Factory</h3>
             <span className="rounded-full bg-warn/12 px-2 py-0.5 text-[11px] font-medium text-warn">
               Pending measurement
             </span>
@@ -248,13 +239,13 @@ export function Comparison() {
                       <motion.span
                         aria-hidden
                         className="absolute inset-x-0 top-0 h-0.5 origin-left bg-accent"
-                        initial={{ scaleX: 0 }}
-                        whileInView={{ scaleX: 1 }}
+                        initial={{ clipPath: "inset(0 100% 0 0)" }}
+                        whileInView={{ clipPath: "inset(0 0% 0 0)" }}
                         viewport={{ once: true }}
                         transition={{ duration: 1, ease: EASE, delay: 0.3 }}
                       />
                     )}
-                    {i === last ? <Wordmark className="justify-center" /> : c}
+                    {i === last ? <Wordmark height={14} className="mx-auto" /> : c}
                   </th>
                 ))}
               </tr>
@@ -320,8 +311,8 @@ export function Team() {
                 />
               </div>
               <div className="relative p-6 pt-5">
-              <h3 className="text-[16px] font-semibold text-fg">{m.name}</h3>
-              <p className="relative mt-1 text-[13px] text-accent">{m.role}</p>
+              <h3 className="text-[16px] font-[510] text-fg">{m.name}</h3>
+              <p className="relative mt-1 text-[13px] text-brand-text">{m.role}</p>
               <a
                 href={`https://github.com/${m.github}`}
                 target="_blank"
@@ -372,24 +363,97 @@ export function Sources() {
   );
 }
 
-/* Footer ---------------------------------------------------------------------- */
+/* Closing --------------------------------------------------------------------- */
+
+export function Closing() {
+  return (
+    <section className="py-32 sm:py-44">
+      <Container className="text-center">
+        <Reveal>
+          <h2 className="t-closing mx-auto max-w-[760px] text-fg">
+            Traceable by default.
+            <br />
+            <span className="text-fg-3">Approved by people.</span>
+          </h2>
+        </Reveal>
+        <Reveal delay={0.15} className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          <ButtonLink href="#/app">
+            Open workspace <Icon name="arrow" size={13} />
+          </ButtonLink>
+          <ButtonLink href={`${REPO}/issues/16`} external variant="outline">
+            Read the proposal
+          </ButtonLink>
+        </Reveal>
+      </Container>
+    </section>
+  );
+}
+
+/* Footer ------------------------------------------------------------------------ */
+
+const footerCols = [
+  {
+    title: "Product",
+    links: [
+      { label: "Workspace preview", href: "#/app" },
+      { label: "How it works", href: "#product" },
+      { label: "Comparison", href: "#comparison" },
+    ],
+  },
+  {
+    title: "Project",
+    links: [
+      { label: "Proposal #16", href: `${REPO}/issues/16` },
+      { label: "Backend #17", href: `${REPO}/issues/17` },
+      { label: "Models #18", href: `${REPO}/issues/18` },
+      { label: "Frontend #19", href: `${REPO}/issues/19` },
+    ],
+  },
+  {
+    title: "Data",
+    links: [
+      { label: "MaintIE", href: "https://github.com/nlp-tlp/maintie" },
+      { label: "MaintIE paper", href: "https://aclanthology.org/2024.lrec-main.954.pdf" },
+      { label: "AMD API docs", href: "https://amd-aim.github.io/radeon-cloud-docs/api/chat-completions/" },
+    ],
+  },
+  {
+    title: "Team",
+    links: team.members.map((m) => ({ label: m.name, href: `https://github.com/${m.github}` })),
+  },
+];
 
 export function Footer() {
   return (
-    <footer className="border-t border-line py-12">
+    <footer className="border-t border-line pt-14 pb-16">
       <Container>
-        <div className="flex flex-wrap items-center justify-between gap-4 text-[13px] text-fg-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Wordmark className="text-fg" />
-            <span>MIT License</span>
-            <span className="text-fg-4">·</span>
-            <span>Built for AMD Developer Hackathon ACT III</span>
+        <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
+          <div>
+            <Wordmark height={18} />
+            <p className="mt-4 max-w-[240px] text-[13px] leading-5 text-fg-4">
+              Built for AMD Developer Hackathon ACT III · MIT License
+            </p>
           </div>
-          <a href={REPO} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-fg">
-            <Icon name="github" size={14} /> GitHub
-          </a>
+          {footerCols.map((col) => (
+            <div key={col.title}>
+              <h3 className="text-[13px] leading-5 font-[510] tracking-[-0.01em] text-fg">{col.title}</h3>
+              <ul className="mt-4 space-y-2.5">
+                {col.links.map((l) => (
+                  <li key={l.label}>
+                    <a
+                      href={l.href}
+                      {...(l.href.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}
+                      className="text-[13px] leading-5 text-fg-3 transition-colors hover:text-fg"
+                    >
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        <p className="mt-6 text-[12px] text-fg-4">
+        <p className="mt-16 text-[12px] text-fg-4">
           Synthetic demo data is labelled as synthetic. No factory connection, failure prediction or production savings
           are claimed.
         </p>
