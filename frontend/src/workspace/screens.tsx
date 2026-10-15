@@ -160,7 +160,7 @@ export function SourceScreen({ onNext, select }: { onNext: () => void; select: S
             ))}
           </dl>
           <div className="mt-4 rounded-[var(--radius)] border border-dashed border-line-strong p-4 text-center text-[12px] text-fg-3">
-            Drop a CSV, XLSX or JSON export
+            Synthetic fixture loaded · file upload is not connected in this preview
           </div>
         </Panel>
         <Panel title="Rows">
@@ -336,8 +336,8 @@ export function ReviewScreen({
     );
 
   const decide = (state: RecordState) => {
-    if ((state === "corrected" || state === "rejected") && !reason.trim()) {
-      setError("A reason is required to correct or reject.");
+    if (!reason.trim()) {
+      setError("A reason is required for every review decision.");
       return;
     }
     setError(null);
@@ -465,7 +465,7 @@ export function ReviewScreen({
                 onChange={(e) => setReason(e.target.value)}
                 aria-invalid={!!error}
                 aria-describedby={error ? "reason-error" : undefined}
-                placeholder="Required to correct or reject"
+                placeholder="Required for every decision"
                 className="mt-1.5 h-9 w-full rounded-[var(--radius)] border border-line-strong bg-bg px-3 text-[13px] text-fg placeholder:text-fg-4 focus:border-accent/60 focus:outline-none"
               />
               <p id="reason-error" aria-live="polite" className="mt-1.5 min-h-4 text-[12px] text-danger">
@@ -728,14 +728,15 @@ export function EvidenceScreen({
         </label>
         <input
           id="expert-reason"
+          aria-required="true"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Evidence you relied on"
+          placeholder="Required: evidence you relied on"
           className="mt-1.5 h-9 w-full rounded-[var(--radius)] border border-line-strong bg-bg px-3 text-[13px] text-fg placeholder:text-fg-4 focus:border-accent/60 focus:outline-none"
         />
         <div className="mt-3 flex flex-wrap gap-2">
           {outcomes.map(({ o, label, v }) => (
-            <Btn key={o} variant={v} onClick={() => onDecide({ outcome: o, reason })}>
+            <Btn key={o} variant={v} disabled={!reason.trim()} onClick={() => onDecide({ outcome: o, reason: reason.trim() })}>
               {label}
             </Btn>
           ))}

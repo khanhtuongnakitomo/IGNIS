@@ -76,14 +76,16 @@ export function Workspace({ embedded = false }: { embedded?: boolean }) {
     <ReviewScreen
       blocked={!mappingConfirmed}
       decisions={decisions}
-      onDecide={(id, state, reason) =>
-        setDecisions((d) => ({ ...d, [id]: { state, reason, revision: d[id].revision + 1 } }))
-      }
+      onDecide={(id, state, reason) => {
+        setDecisions((d) => ({ ...d, [id]: { state, reason, revision: d[id].revision + 1 } }));
+        setExpert(null);
+        setReportIssued(false);
+      }}
       onNext={() => go(3)}
       select={select}
     />,
     <FactsScreen blocked={approvedCount === 0} approved={approvedCount} pending={pendingCount} onNext={() => go(4)} select={select} />,
-    <EvidenceScreen blocked={approvedCount === 0} expert={expert} onDecide={setExpert} onNext={() => go(5)} select={select} />,
+    <EvidenceScreen blocked={approvedCount === 0} expert={expert} onDecide={(decision) => { setExpert(decision); setReportIssued(false); }} onNext={() => go(5)} select={select} />,
     <ReportScreen blocked={!expertOk} issued={reportIssued} onIssue={() => setReportIssued(true)} select={select} />,
   ];
 

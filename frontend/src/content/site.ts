@@ -38,7 +38,7 @@ export const pillars = [
   {
     fig: "FIG 0.1",
     title: "Models propose",
-    body: "A hosted AMD model suggests components, faults and actions as spans of the original text. Suggestions stay pending.",
+    body: "The planned AMD adapter will suggest components, faults and actions as spans of the original text. This preview uses fixtures; suggestions stay pending.",
   },
   {
     fig: "FIG 0.2",
@@ -115,7 +115,7 @@ export const features = [
   {
     icon: "spans",
     title: "Span-level extraction",
-    body: "A hosted AMD model suggests components, faults and actions anchored to exact text spans.",
+    body: "Fixture suggestions are anchored to exact text spans. Hosted AMD inference is planned and is not connected to this preview.",
   },
   {
     icon: "review",

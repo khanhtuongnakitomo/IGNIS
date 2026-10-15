@@ -1,6 +1,5 @@
 import {
   siAmd,
-  siFastapi,
   siGithubactions,
   siPydantic,
   siPython,
@@ -26,9 +25,9 @@ const rowA: Tech[] = [
   { name: "openpyxl", mono: "xl" },
   { name: "ReportLab", mono: "RL" },
   { name: "PyYAML", icon: siYaml },
-  { name: "FastAPI", icon: siFastapi },
+  { name: "Python HTTP API", mono: "API" },
   { name: "SQLite", icon: siSqlite },
-  { name: "AMD Token Factory", icon: siAmd },
+  { name: "AMD Token Factory (planned)", icon: siAmd },
 ];
 
 const rowB: Tech[] = [
@@ -88,8 +87,8 @@ export function Stack() {
   return (
     <Section
       eyebrow="Stack"
-      title="Built on open tools and AMD inference"
-      intro="Typed Python for ingestion, rules and reports. A React workspace for review. Hosted models on AMD for extraction and cited drafts."
+      title="Open tools, with AMD inference planned"
+      intro="Typed Python for ingestion, rules and reports. A React workspace preview uses synthetic fixtures. The hosted AMD extraction and explanation adapters are not connected yet."
     >
       <Reveal className="-mx-4 space-y-6 sm:-mx-8">
         <Marquee items={rowA} seconds={42} />
