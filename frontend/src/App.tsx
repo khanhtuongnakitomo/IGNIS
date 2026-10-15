@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MotionConfig } from "motion/react";
 import { Nav } from "./components/landing/Nav";
 import { Hero } from "./components/landing/Hero";
-import { Challenge, Features, Product, Track } from "./components/landing/Story";
+import { Challenge, Features, Product } from "./components/landing/Story";
 import { Closing, Comparison, Delivered, Footer, ProductFrame, Sources, Team } from "./components/landing/Proof";
 import { Figures, Statement, Strip } from "./components/landing/Intro";
 import { Stack } from "./components/landing/Stack";
@@ -30,7 +30,6 @@ function Landing() {
         <Statement />
         <Figures />
         <Challenge />
-        <Track />
         <Product />
         <Features />
         <ProductFrame />

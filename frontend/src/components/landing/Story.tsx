@@ -5,11 +5,11 @@ import { Icon } from "../ui/icons";
 import { CountUp, EASE, Reveal, Stagger, StaggerItem, trackSpotlight } from "../ui/motion";
 import { cx, Section } from "../ui/primitives";
 
-/* 01 — Challenge ---------------------------------------------------------- */
+/* 01 — Challenge and track ------------------------------------------------- */
 
 export function Challenge() {
   return (
-    <Section id="challenge" eyebrow="01 — Challenge" title="AMD Developer Hackathon: ACT III" intro={challenge.intro}>
+    <Section id="challenge" eyebrow="01 — Challenge" title={challenge.title} intro={challenge.intro}>
       <Stagger className="grid grid-cols-2 overflow-hidden rounded-[var(--radius-lg)] border border-line lg:grid-cols-4">
         {challenge.stats.map((s, i) => (
           <StaggerItem
@@ -32,60 +32,26 @@ export function Challenge() {
         ))}
       </Stagger>
 
-      <Reveal className="mt-10" delay={0.1}>
-        <p className="font-mono text-[11px] tracking-wide text-fg-4 uppercase">Judged on</p>
-        <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {challenge.criteria.map((c) => (
-            <li
-              key={c}
-              className="rounded-[var(--radius)] border border-line px-3 py-2.5 text-center text-[13px] text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
-            >
-              {c}
-            </li>
-          ))}
-        </ul>
-      </Reveal>
-    </Section>
-  );
-}
-
-/* 02 — Track & problem ----------------------------------------------------- */
-
-export function Track() {
-  return (
-    <Section eyebrow="02 — Our track" title={track.title}>
-      <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+      <div className="mt-16 grid gap-12 lg:mt-20 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
         <Reveal>
-          <blockquote className="border-l-2 border-accent pl-5">
-            <p className="text-[22px] leading-snug font-medium tracking-[-0.01em] text-fg sm:text-[26px]">
+          <p className="t-label">{track.title}</p>
+          <blockquote className="mt-5 border-l-2 border-accent pl-5">
+            <p className="text-[22px] leading-snug font-[510] tracking-[-0.015em] text-fg sm:text-[26px]">
               “{track.quote}”
             </p>
-            <p className="mt-4 text-[15px] text-fg-2">“{track.problem}”</p>
-            <footer className="mt-4 font-mono text-[11px] text-fg-4">Track 1 brief · lablab.ai</footer>
+            <p className="mt-4 text-[15px] text-fg-3">“{track.problem}”</p>
           </blockquote>
         </Reveal>
 
         <Reveal delay={0.1}>
           <figure aria-labelledby="coverage-title">
-            <figcaption id="coverage-title" className="mb-4 flex items-baseline justify-between gap-4">
-              <span className="text-[13px] font-medium text-fg">Factory data sources named in the brief</span>
-              <span className="font-mono text-[11px] text-fg-4">IGNIS coverage</span>
+            <figcaption id="coverage-title" className="mb-4 text-[13px] font-[510] text-fg">
+              Factory data sources named in the brief
             </figcaption>
             <CoverageChart />
-            <p className="mt-4 text-[12px] text-fg-3">Roadmap items are designed, not built.</p>
           </figure>
         </Reveal>
       </div>
-
-      <Stagger className="mt-14 grid gap-3 md:grid-cols-3">
-        {track.problems.map((p, i) => (
-          <StaggerItem key={p.title} className="rounded-[var(--radius-lg)] border border-line bg-elevated p-6">
-            <div className="font-mono text-[11px] text-fg-4">0{i + 1}</div>
-            <h3 className="mt-3 text-[15px] font-[510] text-fg">{p.title}</h3>
-            <p className="mt-2 text-[14px] leading-relaxed text-fg-2">{p.body}</p>
-          </StaggerItem>
-        ))}
-      </Stagger>
     </Section>
   );
 }
@@ -222,7 +188,7 @@ function FlowDiagram() {
 
 export function Product() {
   return (
-    <Section id="product" eyebrow="03 — Product" title={product.title} intro={product.intro}>
+    <Section id="product" eyebrow="02 — Product" title={product.title} intro={product.intro}>
       <Reveal>
         <FlowDiagram />
       </Reveal>

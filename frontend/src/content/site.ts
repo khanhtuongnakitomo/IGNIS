@@ -53,6 +53,7 @@ export const pillars = [
 ];
 
 export const challenge = {
+  title: "AMD Developer Hackathon: ACT III",
   intro:
     "A hybrid build event on lablab.ai, online 12–18 October 2026, with an on-site final phase in Italy for selected teams. AMD technology must be part of the working product.",
   stats: [

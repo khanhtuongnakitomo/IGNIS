@@ -160,13 +160,13 @@ body {
   }
 }
 
-/* Tech-stack marquee: two copies of the list, shifted by exactly one copy (half the track + half a gap). */
+/* Tech-stack marquee: two copies of the list, shifted by exactly one copy. */
 @keyframes marquee {
   from {
     transform: translateX(0);
   }
   to {
-    transform: translateX(calc(-50% - 6px));
+    transform: translateX(-50%);
   }
 }
 .marquee-track {
