@@ -34,8 +34,8 @@ function ScreenHeader({ title, desc, children }: { title: string; desc: string; 
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-fg">{title}</h1>
-        <p className="mt-1 max-w-xl text-[13px] text-fg-3">{desc}</p>
+        <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.02em] text-fg">{title}</h1>
+        <p className="mt-2 max-w-xl text-[14px] leading-[1.55] text-fg-3">{desc}</p>
       </div>
       {children && <div className="flex items-center gap-2">{children}</div>}
     </div>
@@ -46,8 +46,8 @@ function Panel({ title, aside, children, className }: { title?: string; aside?: 
   return (
     <section className={cx("rounded-[var(--radius-lg)] border border-line bg-elevated", className)}>
       {title && (
-        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-fg">{title}</h2>
+        <div className="flex h-12 items-center justify-between gap-3 border-b border-line px-4">
+          <h2 className="text-[15px] leading-[1.4] font-semibold text-fg">{title}</h2>
           {aside}
         </div>
       )}
@@ -90,7 +90,7 @@ function Blocked({ children }: { children: ReactNode }) {
     <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-dashed border-line-strong p-5 text-[13px] text-fg-2">
       <Icon name="alert" className="mt-0.5 shrink-0 text-warn" />
       <div>
-        <p className="font-medium text-fg">Stage blocked</p>
+        <p className="font-semibold text-fg">Blocked</p>
         <p className="mt-1 text-fg-3">{children}</p>
       </div>
     </div>
@@ -121,8 +121,8 @@ export function SpanText({ record }: { record: WorkOrder }) {
   for (const s of record.spans) {
     if (s.start > cursor) out.push(record.text.slice(cursor, s.start));
     out.push(
-      <span key={s.start} className="relative inline-block pt-3.5">
-        <span className="absolute top-0 left-0 font-mono text-[9px] tracking-wider text-fg-3 uppercase">{s.type}</span>
+      <span key={s.start} className="inline-flex flex-col items-start align-bottom">
+        <span className="font-mono text-[10px] leading-4 text-fg-3">{s.type}</span>
         <span className={cx("rounded-[3px] px-0.5 underline decoration-2 underline-offset-4", spanStyle[s.type])}>
           {record.text.slice(s.start, s.end)}
         </span>
@@ -131,7 +131,7 @@ export function SpanText({ record }: { record: WorkOrder }) {
     cursor = s.end;
   }
   if (cursor < record.text.length) out.push(record.text.slice(cursor));
-  return <p className="text-[16px] leading-[1.9] text-fg">{out}</p>;
+  return <p className="text-[16px] leading-[1.9] whitespace-pre-wrap text-fg">{out}</p>;
 }
 
 /* 1 Source ------------------------------------------------------------------------ */
@@ -139,13 +139,13 @@ export function SpanText({ record }: { record: WorkOrder }) {
 export function SourceScreen({ onNext, select }: { onNext: () => void; select: Select }) {
   return (
     <>
-      <ScreenHeader title="Source" desc="Upload a maintenance export. The original file and rows are kept unmodified.">
+      <ScreenHeader title="Source" desc="Original rows are kept unmodified.">
         <Btn variant="primary" onClick={onNext}>
           Continue to mapping <Icon name="arrow" size={14} />
         </Btn>
       </ScreenHeader>
       <div className="grid gap-4">
-        <Panel title="File" aside={<Badge t="synthetic">Synthetic demo file</Badge>}>
+        <Panel title="File">
           <dl className="grid grid-cols-2 gap-4 text-[13px] sm:grid-cols-4">
             {[
               ["File", run.file],
@@ -154,19 +154,19 @@ export function SourceScreen({ onNext, select }: { onNext: () => void; select: S
               ["Rows read", `${run.rows} · ${run.issues} issue`],
             ].map(([k, v]) => (
               <div key={k}>
-                <dt className="text-[11px] text-fg-4">{k}</dt>
+                <dt className="text-[12px] text-fg-4">{k}</dt>
                 <dd className="mt-1 truncate font-mono text-[12px] text-fg-2">{v}</dd>
               </div>
             ))}
           </dl>
           <div className="mt-4 rounded-[var(--radius)] border border-dashed border-line-strong p-4 text-center text-[12px] text-fg-3">
-            Drop CSV / XLSX / JSON — upload is wired once the backend route exists
+            Drop a CSV, XLSX or JSON export
           </div>
         </Panel>
-        <Panel title="Preview · unmodified rows">
+        <Panel title="Rows">
           <div className="scrollbar-thin overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-[13px]">
-              <thead className="text-[11px] text-fg-4">
+              <thead className="text-[12px] text-fg-4">
                 <tr className="border-b border-line">
                   <th className="py-2 pr-3 font-medium">Row</th>
                   {columns.map((c) => (
@@ -183,10 +183,10 @@ export function SourceScreen({ onNext, select }: { onNext: () => void; select: S
                     onClick={() => select({ kind: "record", id: r.id })}
                     className="cursor-pointer border-b border-line last:border-0 hover:bg-hover"
                   >
-                    <td className="py-2 pr-3 font-mono text-[11px] text-fg-4">{r.row}</td>
-                    <td className="py-2 pr-3 text-fg-2">{r.text}</td>
-                    <td className="py-2 pr-3 font-mono text-[12px] text-fg-2">{r.asset}</td>
-                    <td className="py-2 pr-3 font-mono text-[12px] text-fg-3">2026-0{r.row}-14</td>
+                    <td className="h-9 pr-3 font-mono text-[12px] text-fg-4">{r.row}</td>
+                    <td className="h-9 pr-3 text-fg-2">{r.text}</td>
+                    <td className="h-9 pr-3 font-mono text-[12px] text-fg-2">{r.asset}</td>
+                    <td className="h-9 pr-3 font-mono text-[12px] text-fg-3">2026-0{r.row}-14</td>
                     <td className={cx("py-2 pr-3 font-mono text-[12px]", r.row === 5 ? "text-danger" : "text-fg-3")}>
                       {r.row === 5 ? "-3" : "4.5"}
                     </td>
@@ -205,7 +205,7 @@ export function SourceScreen({ onNext, select }: { onNext: () => void; select: S
 function ValidationIssues() {
   return (
     <div className="rounded-[var(--radius-lg)] border border-line border-l-2 border-l-warn bg-elevated p-4">
-      <p className="text-[13px] font-medium text-fg">Row validation issues</p>
+      <p className="text-[15px] font-semibold text-fg">Validation issues</p>
       <ul className="mt-2 space-y-1 text-[13px] text-fg-2">
         {rowIssues.map((i) => (
           <li key={i.row}>
@@ -235,7 +235,7 @@ export function MappingScreen({
 }) {
   return (
     <>
-      <ScreenHeader title="Mapping" desc="Heuristic matches stay proposed until a person confirms them. Confirmation records the reviewer.">
+      <ScreenHeader title="Mapping" desc="Matches stay proposed until you confirm them.">
         {confirmed ? (
           <Btn variant="primary" onClick={onNext}>
             Continue to review <Icon name="arrow" size={14} />
@@ -247,11 +247,11 @@ export function MappingScreen({
         )}
       </ScreenHeader>
       <Panel
-        title="Source column → canonical field"
+        title="Columns"
         aside={
           <AnimatePresence mode="wait" initial={false}>
             <motion.span key={String(confirmed)} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}>
-              {confirmed ? <Badge t="ok">Confirmed · reviewer “you” · rev 1</Badge> : <Badge t="warn">Proposed</Badge>}
+              {confirmed ? <Badge t="ok">Confirmed</Badge> : <Badge t="warn">Proposed</Badge>}
             </motion.span>
           </AnimatePresence>
         }
@@ -267,7 +267,7 @@ export function MappingScreen({
             >
               <button type="button" onClick={() => select({ kind: "column", id: c.source })} className="text-left">
                 <div className="text-[13px] text-fg">{c.source}</div>
-                <div className="truncate font-mono text-[11px] text-fg-4">{c.sample}</div>
+                <div className="truncate font-mono text-[12px] text-fg-4">{c.sample}</div>
               </button>
               <Icon name="arrow" className="text-fg-4" />
               <div className="text-[13px] text-fg-2">{c.target}</div>
@@ -349,7 +349,7 @@ export function ReviewScreen({
 
   return (
     <>
-      <ScreenHeader title="Annotation review" desc="A model response never approves a record. Pending and rejected records are excluded from facts.">
+      <ScreenHeader title="Annotation review" desc="Only approved and corrected records count.">
         <Btn variant="primary" onClick={onNext}>
           Continue to facts <Icon name="arrow" size={14} />
         </Btn>
@@ -398,21 +398,19 @@ export function ReviewScreen({
               title={`Record ${record.id}`}
               aside={
                 <div className="flex items-center gap-2">
-                  <span className="hidden font-mono text-[11px] text-fg-4 sm:inline">row {record.row} · prompt —</span>
+                  <span className="hidden font-mono text-[12px] text-fg-4 sm:inline">row {record.row}</span>
                   <Badge t={stateTone[decision.state]}>
                     <span className="capitalize">{decision.state}</span>
                   </Badge>
                 </div>
               }
             >
-              <p className="mb-2 font-mono text-[10px] tracking-wider text-fg-4 uppercase">Original text</p>
-              {record.invalidOutput ? (
+                            {record.invalidOutput ? (
                 <>
                   <p className="text-[16px] text-fg">{record.text}</p>
                   <div className="mt-4 rounded-[var(--radius)] border border-line border-l-2 border-l-danger bg-bg p-3 text-[13px]">
                     <p className="font-medium text-danger">Invalid model output</p>
                     <p className="mt-1 text-fg-2">{record.invalidOutput}</p>
-                    <p className="mt-1 text-fg-3">Manual annotation remains available. Nothing was auto-approved.</p>
                   </div>
                 </>
               ) : (
@@ -431,7 +429,7 @@ export function ReviewScreen({
             {!record.invalidOutput && (
               <Panel title="Suggestions">
                 <table className="w-full text-left text-[13px]">
-                  <thead className="text-[11px] text-fg-4">
+                  <thead className="text-[12px] text-fg-4">
                     <tr>
                       <th className="pb-2 font-medium">Entity</th>
                       <th className="pb-2 font-medium">Type</th>
@@ -442,9 +440,9 @@ export function ReviewScreen({
                   <tbody>
                     {record.spans.map((s) => (
                       <tr key={s.start} className="border-t border-line">
-                        <td className="py-2 text-fg">{record.text.slice(s.start, s.end)}</td>
-                        <td className="py-2 text-fg-2">{s.type}</td>
-                        <td className="py-2 font-mono text-[12px] text-fg-3">
+                        <td className="h-9 text-fg">{record.text.slice(s.start, s.end)}</td>
+                        <td className="h-9 text-fg-2">{s.type}</td>
+                        <td className="h-9 font-mono text-[12px] text-fg-3">
                           {s.start}–{s.end}
                         </td>
                         <td className="py-2">
@@ -459,7 +457,7 @@ export function ReviewScreen({
 
             <Panel title="Decision">
               <label htmlFor="reason" className="text-[12px] text-fg-3">
-                Reason <span className="text-fg-4">(required to correct or reject)</span>
+                Reason
               </label>
               <input
                 id="reason"
@@ -467,7 +465,7 @@ export function ReviewScreen({
                 onChange={(e) => setReason(e.target.value)}
                 aria-invalid={!!error}
                 aria-describedby={error ? "reason-error" : undefined}
-                placeholder="e.g. fault span should include “again”"
+                placeholder="Required to correct or reject"
                 className="mt-1.5 h-9 w-full rounded-[var(--radius)] border border-line-strong bg-bg px-3 text-[13px] text-fg placeholder:text-fg-4 focus:border-accent/60 focus:outline-none"
               />
               <p id="reason-error" aria-live="polite" className="mt-1.5 min-h-4 text-[12px] text-danger">
@@ -491,8 +489,8 @@ export function ReviewScreen({
               </div>
               {decision.revision > 0 && (
                 <p className="mt-4 border-t border-line pt-3 font-mono text-[11px] text-fg-3">
-                  History · rev {decision.revision} · {decision.state}
-                  {decision.reason && ` · “${decision.reason}”`} · reviewer “you”
+                  rev {decision.revision} · {decision.state}
+                  {decision.reason && ` · “${decision.reason}”`}
                 </p>
               )}
             </Panel>
@@ -528,7 +526,7 @@ export function FactsScreen({
   const bandTone: Record<string, Tone> = { High: "accent", Medium: "warn", Low: "plain" };
   return (
     <>
-      <ScreenHeader title="Facts & alerts" desc="Values come from the backend. The frontend never recalculates severity or priority.">
+      <ScreenHeader title="Facts & alerts" desc="Computed by code from the approved snapshot.">
         <Btn variant="primary" onClick={onNext}>
           Investigate evidence <Icon name="arrow" size={14} />
         </Btn>
@@ -537,8 +535,7 @@ export function FactsScreen({
         <span className="rounded-[4px] border border-line px-2 py-1">snapshot snap_mock_02</span>
         <span className="rounded-[4px] border border-line px-2 py-1">approved {approved}</span>
         <span className="rounded-[4px] border border-line px-2 py-1">excluded / pending {6 - approved}</span>
-        <span className="rounded-[4px] border border-line px-2 py-1">rules severity_v1 · triage_v1</span>
-      </div>
+              </div>
 
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
@@ -565,7 +562,7 @@ export function FactsScreen({
       <Panel title="Component priority" aside={pending > 0 ? <Badge t="warn">{pending} pending excluded</Badge> : undefined}>
         <div className="scrollbar-thin overflow-x-auto">
           <table className="w-full min-w-[620px] text-left text-[13px]">
-            <thead className="text-[11px] text-fg-4">
+            <thead className="text-[12px] text-fg-4">
               <tr>
                 {["Fact", "Component", "Severity", "Recurrence", "Criticality", "Priority", "Band"].map((h) => (
                   <th key={h} className="pb-2 font-medium">
@@ -583,7 +580,7 @@ export function FactsScreen({
                   transition={{ delay: 0.1 + i * 0.05, duration: 0.4, ease: EASE }}
                   className="border-t border-line"
                 >
-                  <td className="py-2.5">
+                  <td className="h-9">
                     <IdChip id={f.id} kind="fact" select={select} />
                   </td>
                   <td className="py-2.5 text-fg">{f.component}</td>
@@ -591,14 +588,14 @@ export function FactsScreen({
                   <td className="py-2.5 font-mono text-fg-2">{f.recurrence}</td>
                   <td className="py-2.5 font-mono text-fg-2">{f.criticality}</td>
                   <td className="py-2.5 font-mono text-fg">{f.priority ?? <NotComputed />}</td>
-                  <td className="py-2.5">{f.band ? <Badge t={bandTone[f.band]}>{f.band}</Badge> : <NotComputed />}</td>
+                  <td className="h-9">{f.band ? <Badge t={bandTone[f.band]}>{f.band}</Badge> : <NotComputed />}</td>
                 </motion.tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-[12px] text-fg-3">
-          Priority is a historical rule-based ordering, not a failure chance. Mock values.
+          Priority is a rule-based ordering, not a failure probability.
         </p>
       </Panel>
     </>
@@ -640,7 +637,7 @@ export function EvidenceScreen({
   ];
   return (
     <>
-      <ScreenHeader title="Evidence & expert review" desc="The model drafts; the expert decides. Maintenance authorisation is a separate action.">
+      <ScreenHeader title="Evidence & expert review" desc="The model drafts. The expert decides.">
         <Btn variant="primary" onClick={onNext} disabled={!expert}>
           Continue to report <Icon name="arrow" size={14} />
         </Btn>
@@ -649,7 +646,6 @@ export function EvidenceScreen({
         <span className="rounded-[4px] border border-line px-2 py-1">alert {alert.id}</span>
         <span className="rounded-[4px] border border-line px-2 py-1">snapshot {alert.snapshot}</span>
         <span className="rounded-[4px] border border-line px-2 py-1">pack ep_mock_01</span>
-        <Badge t="neutral">MOCK</Badge>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -659,7 +655,7 @@ export function EvidenceScreen({
             <span className="text-fg-2">seal · P-101 — priority 6, band High, recurrence 2</span>
           </div>
         </Panel>
-        <Panel title="Applicable evidence" aside={<span className="font-mono text-[11px] text-fg-4">top {passages.length} of 3</span>}>
+        <Panel title="Applicable evidence" aside={<span className="font-mono text-[12px] text-fg-4">top {passages.length} of 3</span>}>
           <ul className="space-y-3">
             {passages.map((p) => (
               <li key={p.id} className="text-[13px]">
@@ -692,7 +688,7 @@ export function EvidenceScreen({
       <section className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-line-strong bg-elevated p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge t="info">{draft.status} · hypothesis</Badge>
-          <span className="font-mono text-[11px] text-fg-4">model — · prompt —</span>
+          
         </div>
         <p className="mt-3 text-[15px] leading-relaxed text-fg">{draft.hypothesis}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -705,15 +701,15 @@ export function EvidenceScreen({
         </div>
         <dl className="mt-4 grid gap-3 text-[13px] sm:grid-cols-2">
           <div>
-            <dt className="text-[11px] text-fg-4">Alternatives</dt>
+            <dt className="text-[12px] text-fg-4">Alternatives</dt>
             <dd className="mt-1 text-fg-2">{draft.alternatives.join("; ")}</dd>
           </div>
           <div>
-            <dt className="text-[11px] text-fg-4">Uncertainty</dt>
+            <dt className="text-[12px] text-fg-4">Uncertainty</dt>
             <dd className="mt-1 text-fg-2">{draft.uncertainty}</dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-[11px] text-fg-4">Suggested inspection · proposal, no authorisation</dt>
+            <dt className="text-[12px] text-fg-4">Suggested inspection (not authorised)</dt>
             <dd className="mt-1 text-fg-2">{draft.inspection}</dd>
           </div>
         </dl>
@@ -752,8 +748,7 @@ export function EvidenceScreen({
               exit={{ opacity: 0, height: 0 }}
               className="mt-3 overflow-hidden font-mono text-[11px] text-fg-3"
             >
-              Saved · {expert.outcome} · reviewer “you”{expert.reason && ` · “${expert.reason}”`}. Maintenance authorisation not
-              granted by this decision.
+              Saved · {expert.outcome}{expert.reason && ` · “${expert.reason}”`}
             </motion.p>
           )}
         </AnimatePresence>
@@ -777,14 +772,14 @@ export function ReportScreen({
 }) {
   return (
     <>
-      <ScreenHeader title="Report" desc="Issued only from pinned facts and reviewed findings. A failure never links an older report as new.">
+      <ScreenHeader title="Report" desc="Issued from pinned facts and reviewed findings.">
         <Btn variant="primary" onClick={onIssue} disabled={blocked || issued}>
           Generate approved report
         </Btn>
       </ScreenHeader>
       {blocked && (
         <div className="mb-4">
-          <Blocked>The expert must accept or correct the finding first. Rejected or inconclusive findings cannot become report assertions.</Blocked>
+          <Blocked>Accept or correct the finding first.</Blocked>
         </div>
       )}
       <Panel
@@ -792,7 +787,7 @@ export function ReportScreen({
         aside={
           <AnimatePresence mode="wait" initial={false}>
             <motion.span key={String(issued)} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-              {issued ? <Badge t="ok">Approved · mock, no PDF generated</Badge> : <Badge t="warn">Draft</Badge>}
+              {issued ? <Badge t="ok">Approved</Badge> : <Badge t="warn">Draft</Badge>}
             </motion.span>
           </AnimatePresence>
         }
@@ -800,7 +795,7 @@ export function ReportScreen({
         <ol className="space-y-3">
           {claims.map((c, i) => (
             <li key={i} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 border-b border-line pb-3 last:border-0 last:pb-0">
-              <span className="font-mono text-[11px] text-fg-4">C{i + 1}</span>
+              <span className="font-mono text-[12px] text-fg-4">C{i + 1}</span>
               <span className="flex-1 text-[14px] text-fg">{c.text}</span>
               <span className="flex gap-1">
                 {c.refs.map((r) => (
@@ -810,17 +805,12 @@ export function ReportScreen({
             </li>
           ))}
         </ol>
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3 text-[11px]">
-          <Badge t="plain">Real-source text · none in mock</Badge>
-          <Badge t="synthetic">Synthetic fields</Badge>
-          <Badge t="neutral">Mode · mock</Badge>
-        </div>
       </Panel>
       <Panel title="Output history" className="mt-4">
         {issued ? (
-          <p className="font-mono text-[12px] text-fg-2">v1 · ep_mock_01 · reviewer “you” · hash — (preview only)</p>
+          <p className="font-mono text-[12px] text-fg-2">v1 · ep_mock_01</p>
         ) : (
-          <p className="text-[13px] text-fg-3">No report issued for this run.</p>
+          <p className="text-[14px] text-fg-3">No report issued yet.</p>
         )}
       </Panel>
     </>

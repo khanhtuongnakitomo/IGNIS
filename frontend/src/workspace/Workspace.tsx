@@ -88,42 +88,28 @@ export function Workspace({ embedded = false }: { embedded?: boolean }) {
   ];
 
   return (
-    <div className={cx("relative flex flex-col bg-bg text-fg", embedded ? "h-full" : "h-dvh")}>
+    <div className={cx("relative flex flex-col bg-bg text-[14px] tracking-normal text-fg", embedded ? "h-full" : "h-dvh")}>
       {/* Top bar */}
-      <header className="border-b border-line bg-elevated">
-        <div className="flex h-12 items-center justify-between gap-3 px-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <a href="#/" aria-label="Back to landing page" className="flex items-center">
-              <Wordmark height={15} />
-            </a>
-            <span className="hidden truncate text-[13px] text-fg-3 sm:inline">Maintenance evidence workspace</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden font-mono text-[12px] text-fg-3 sm:inline">Run {run.id}</span>
-            <button
-              type="button"
-              onClick={() => setDrawer((v) => !v)}
-              className="grid size-8 place-items-center rounded-[var(--radius)] text-fg-3 hover:bg-hover hover:text-fg xl:hidden"
-              aria-label="Toggle evidence inspector"
-              aria-expanded={drawer}
-            >
-              <Icon name="panel" />
-            </button>
-          </div>
-        </div>
-        <div className="scrollbar-thin flex items-center gap-2 overflow-x-auto px-4 pb-2.5">
-          <Badge t="warn">MOCK DATA · not connected to backend</Badge>
-          <Badge t="plain">REAL-SOURCE TEXT · none in mock</Badge>
-          <Badge t="synthetic">SYNTHETIC FIELDS</Badge>
-          <Badge t="neutral">MODE · mock (not live, not replay)</Badge>
-          <Badge t="plain" dot={false} mono>
-            Model —
-          </Badge>
+      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-elevated px-4">
+        <a href="#/" aria-label="Back to landing page" className="flex items-center">
+          <Wordmark height={15} />
+        </a>
+        <div className="flex items-center gap-2">
+          <Badge t="warn">Mock data</Badge>
+          <button
+            type="button"
+            onClick={() => setDrawer((v) => !v)}
+            className="grid size-8 place-items-center rounded-[var(--radius)] text-fg-3 hover:bg-hover hover:text-fg xl:hidden"
+            aria-label="Toggle evidence inspector"
+            aria-expanded={drawer}
+          >
+            <Icon name="panel" />
+          </button>
         </div>
       </header>
 
       {/* Stepper */}
-      <nav aria-label="Workflow stages" className="scrollbar-thin overflow-x-auto border-b border-line px-2">
+      <nav aria-label="Workflow stages" className="scrollbar-thin overflow-x-auto border-b border-line px-2 lg:hidden">
         <ol className="flex min-w-max items-center">
           {STAGES.map((name, i) => (
             <li key={name} className="relative">
@@ -147,7 +133,6 @@ export function Workspace({ embedded = false }: { embedded?: boolean }) {
                   transition={{ type: "spring", stiffness: 420, damping: 36 }}
                 />
               )}
-              {i < STAGES.length - 1 && <span aria-hidden className="absolute top-1/2 -right-1 text-fg-4">›</span>}
             </li>
           ))}
         </ol>
@@ -155,33 +140,37 @@ export function Workspace({ embedded = false }: { embedded?: boolean }) {
 
       {/* Body */}
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-elevated p-3 lg:flex">
-          <p className="px-2 font-mono text-[10px] tracking-wider text-fg-4 uppercase">Run</p>
-          <div className="mt-2 rounded-[var(--radius)] border border-line bg-bg p-3">
+        <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-elevated p-3 lg:flex" aria-label="Workflow stages">
+          <div className="px-2 py-1.5">
             <div className="truncate text-[13px] text-fg">{run.file}</div>
-            <div className="mt-1 font-mono text-[11px] text-fg-3">{run.hash}</div>
+            <div className="mt-0.5 font-mono text-[12px] text-fg-4">{run.hash}</div>
           </div>
-          <p className="mt-6 px-2 font-mono text-[10px] tracking-wider text-fg-4 uppercase">Stages</p>
-          <ul className="mt-2 space-y-0.5">
+          <ul className="mt-3 space-y-0.5">
             {STAGES.map((name, i) => (
-              <li key={name}>
+              <li key={name} className="relative">
+                {stage === i && (
+                  <motion.span
+                    layoutId="stage-active"
+                    className="absolute inset-0 rounded-[6px] bg-hover"
+                    transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => go(i)}
+                  aria-current={stage === i ? "step" : undefined}
                   className={cx(
-                    "flex w-full items-center justify-between rounded-[6px] px-2 py-1.5 text-left text-[13px] transition-colors",
-                    stage === i ? "bg-hover text-fg" : "text-fg-2 hover:bg-hover/60",
+                    "relative flex h-9 w-full items-center gap-2.5 rounded-[6px] px-2 text-left text-[13px] transition-colors",
+                    stage === i ? "text-fg" : "text-fg-2 hover:text-fg",
                   )}
                 >
+                  <StageDot status={statuses[i]} index={i} />
                   {name}
-                  <span className="font-mono text-[10px] text-fg-4">{statuses[i]}</span>
+                  <span className="sr-only">({statuses[i]})</span>
                 </button>
               </li>
             ))}
           </ul>
-          <div className="mt-auto rounded-[var(--radius)] border border-dashed border-line-strong p-3 text-[12px] leading-relaxed text-fg-3">
-            Design preview. Decisions live in this browser tab only and reset on reload.
-          </div>
         </aside>
 
         <main ref={mainRef} className="relative min-w-0 flex-1 overflow-y-auto scrollbar-thin">
@@ -243,14 +232,6 @@ export function Workspace({ embedded = false }: { embedded?: boolean }) {
         </AnimatePresence>
       </div>
 
-      {/* Status bar */}
-      <footer className="flex h-8 items-center gap-4 overflow-x-auto border-t border-line bg-elevated px-4 font-mono text-[11px] whitespace-nowrap text-fg-3">
-        <span>Saved · in-memory mock</span>
-        <span className="text-fg-4">|</span>
-        <span>Context · {approvedCount ? "available (mock)" : "waiting for approved records"}</span>
-        <span className="text-fg-4">|</span>
-        <span>API · not connected</span>
-      </footer>
     </div>
   );
 }

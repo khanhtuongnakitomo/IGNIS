@@ -89,7 +89,7 @@ export function Badge({ children, t = "plain", dot = true, mono }: { children: R
   return (
     <span
       className={cx(
-        "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full px-2 text-[11px] font-medium tracking-[0.01em] whitespace-nowrap",
+        "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] font-medium tracking-[0.01em] whitespace-nowrap",
         mono && "font-mono",
         tone[t],
       )}

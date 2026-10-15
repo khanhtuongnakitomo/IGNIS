@@ -30,7 +30,7 @@ export function ProductFrame() {
     <Section
       eyebrow="04 — Inside IGNIS"
       title="The review workspace"
-      intro="Six stages from source file to signed report. Try it below: confirm the mapping, review records and sign off a finding. Mock data, clearly labelled."
+      intro="Six stages from source file to signed report. Try it below."
     >
       <div ref={ref} style={{ perspective: 1600 }}>
         <motion.div
@@ -56,9 +56,7 @@ export function ProductFrame() {
           </div>
         </motion.div>
       </div>
-      <p className="mt-4 font-mono text-[11px] text-fg-4">
-        {productScreenshot ? productScreenshot.caption : "Design preview · mock data · not connected to the backend or the AMD API"}
-      </p>
+      {productScreenshot && <p className="mt-4 font-mono text-[12px] text-fg-4">{productScreenshot.caption}</p>}
     </Section>
   );
 }
@@ -321,7 +319,6 @@ export function Team() {
               >
                 <Icon name="github" size={12} />@{m.github}
               </a>
-              <p className="relative mt-4 border-t border-line pt-4 text-[13px] leading-relaxed text-fg-2">{m.owns}</p>
               </div>
             </article>
           </StaggerItem>

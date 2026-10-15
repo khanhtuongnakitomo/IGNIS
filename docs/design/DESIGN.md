@@ -101,23 +101,25 @@ Show IDs, hashes, model IDs and versions in `--font-mono`. Truncate them in the 
 
 ## 6. Workspace shell (from issue #19)
 
+Keep the chrome minimal: show only what changes a decision.
+
 ```text
 +---------------------------------------------------------------------+
-| IGNIS  Maintenance evidence workspace          Run <id>  | Help      |
-| [REAL-SOURCE TEXT] [SYNTHETIC FIELDS] [LIVE|REPLAY]  Model <id>      |
-+---------------------------------------------------------------------+
-| 1 Source > 2 Mapping > 3 Review > 4 Facts > 5 Evidence > 6 Report   |
+| IGNIS                                              [Mock data]       |
 +------------+----------------------------------+---------------------+
-| Sidebar    | Current task                     | Evidence inspector  |
-| 240px      | flexible                         | 360px               |
+| file.csv   | Current task                     | Inspector           |
+| sha256…    |                                  | 360px               |
+| 1 Source   |                                  |                     |
+| 2 Mapping  |                                  |                     |
+| 3 Review   |                                  |                     |
+| ...        |                                  |                     |
 +------------+----------------------------------+---------------------+
-| Saved state | Context status | API availability                     |
-+---------------------------------------------------------------------+
 ```
 
-- The stepper shows each stage's backend status (`not started`, `in progress`, `done`, `failed`, `blocked`). A user can open a completed stage; a blocked stage explains why.
-- The bottom status bar shows the last save time, whether context is available, and API status (`ok`, `rate-limited`, `unavailable`).
-- **Below 1024 px** the inspector becomes a drawer. **At 390 px** the sidebar collapses to a menu and tables scroll inside their container.
+- **Top bar:** wordmark plus provenance badges that are true and meaningful for the current run: `Mock data`, `Replay`, `Live` with the actual model ID, or `Synthetic fields`. Never show a placeholder badge such as "Model —".
+- **Sidebar (240 px):** the source file and hash, then the six stages with a status icon (done, to do, blocked). Below 1024 px the sidebar is replaced by a horizontal stepper.
+- **No status bar.** API, rate-limit and missing-context problems appear as a failure panel in the stage where they happen.
+- Below 1280 px the inspector becomes a drawer. At 390 px tables scroll inside their container.
 
 ## 7. Screens
 

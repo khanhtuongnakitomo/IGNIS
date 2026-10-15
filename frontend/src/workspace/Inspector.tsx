@@ -74,9 +74,8 @@ function resolve(selection: NonNullable<Selection>, decisions: Record<string, De
 export function Inspector({ selection, decisions }: { selection: Selection; decisions: Record<string, Decision> }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line px-4 py-3">
-        <p className="text-[13px] font-semibold text-fg">Evidence inspector</p>
-        <p className="text-[11px] text-fg-4">IDs, versions and source provenance</p>
+      <div className="flex h-12 items-center border-b border-line px-4">
+        <p className="text-[15px] font-semibold text-fg">Inspector</p>
       </div>
       <div className="scrollbar-thin flex-1 overflow-y-auto p-4">
         <AnimatePresence mode="wait">
@@ -104,8 +103,8 @@ export function Inspector({ selection, decisions }: { selection: Selection; deci
               })()}
             </motion.div>
           ) : (
-            <motion.p key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[13px] text-fg-3">
-              Select a record, fact, passage or citation to see where it came from.
+            <motion.p key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[14px] text-fg-3">
+              Select an ID to see its source.
             </motion.p>
           )}
         </AnimatePresence>
