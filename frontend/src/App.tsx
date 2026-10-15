@@ -5,6 +5,7 @@ import { Hero } from "./components/landing/Hero";
 import { Challenge, Features, Product, Track } from "./components/landing/Story";
 import { Closing, Comparison, Delivered, Footer, ProductFrame, Sources, Team } from "./components/landing/Proof";
 import { Figures, Statement, Strip } from "./components/landing/Intro";
+import { Stack } from "./components/landing/Stack";
 import { Workspace } from "./workspace/Workspace";
 
 // Hash routing keeps the build static: "#/app" is the workspace, anything else the landing page.
@@ -33,6 +34,7 @@ function Landing() {
         <Product />
         <Features />
         <ProductFrame />
+        <Stack />
         <Delivered />
         <Comparison />
         <Team />

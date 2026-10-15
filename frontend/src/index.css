@@ -159,3 +159,27 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Tech-stack marquee: two copies of the list, shifted by exactly one copy (half the track + half a gap). */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50% - 6px));
+  }
+}
+.marquee-track {
+  animation: marquee linear infinite;
+}
+.marquee-reverse {
+  animation-direction: reverse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+  .marquee {
+    overflow-x: auto;
+  }
+}

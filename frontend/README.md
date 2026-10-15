@@ -4,7 +4,7 @@ Landing page and workspace design preview for [issue #19](https://github.com/kha
 
 **Status:** the workspace at `#/app` runs on synthetic mock data and is labelled that way on screen. It is not connected to a backend or the AMD API. Review decisions stay in the browser tab and reset on reload.
 
-**Stack:** React 19, TypeScript, Vite 7, Tailwind CSS v4 and `motion` for animation. It uses system fonts only and inline SVG for icons and charts. Confirm this stack with the backend owner before integrating.
+**Stack:** React 19, TypeScript, Vite 7, Tailwind CSS v4, `motion` for animation and `simple-icons` (bundled SVG paths) for the tech-stack logos. It uses system fonts only; other icons and charts are inline SVG. Confirm this stack with the backend owner before integrating.
 
 ```bash
 cd frontend

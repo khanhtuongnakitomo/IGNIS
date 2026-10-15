@@ -203,7 +203,7 @@ export const team = {
       role: "AI Engineer · Frontend Developer",
       github: "BennedictQuanTon",
       owns: "UI/UX, frontend, demo video and independent end-to-end evaluation",
-      photo: { src: "/team/long-quan-ton.jpg", origin: "50% 30%", scale: 1.25 },
+      photo: { src: "/team/long-quan-ton.jpg", origin: "50% 30%", scale: 1 },
     },
     {
       name: "Yoshio Nomura",
@@ -211,7 +211,7 @@ export const team = {
       role: "AI Engineer · LLMOps",
       github: "UniverseScripts",
       owns: "AMD API integration, MaintIE prompts and model quality/latency benchmarks",
-      photo: { src: "/team/yoshio-nomura.jpg", origin: "46% 18%", scale: 1.5 },
+      photo: { src: "/team/yoshio-nomura.jpg", origin: "46% 22%", scale: 1 },
     },
   ],
 };

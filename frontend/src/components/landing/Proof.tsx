@@ -297,7 +297,7 @@ export function Team() {
                   alt={`Portrait of ${m.name}`}
                   loading="lazy"
                   style={{ transformOrigin: m.photo.origin, objectPosition: m.photo.origin, ["--s" as string]: m.photo.scale }}
-                  className="size-full scale-[var(--s)] object-cover grayscale-[0.85] transition-[filter,scale] duration-700 ease-[var(--ease-out-expo)] group-hover:scale-[calc(var(--s)*1.05)] group-hover:grayscale-0"
+                  className="size-full scale-[var(--s)] object-cover transition-[scale] duration-700 ease-[var(--ease-out-expo)] group-hover:scale-[calc(var(--s)*1.04)]"
                 />
                 <div
                   aria-hidden
