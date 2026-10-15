@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* Tokens mirror docs/design/DESIGN.md. System fonts only: no external font files. */
+@theme {
+  --color-bg: #08090a;
+  --color-elevated: #0f1011;
+  --color-card: #141516;
+  --color-hover: #1c1d1f;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.14);
+
+  --color-fg: #f7f8f8;
+  --color-fg-2: #b4b8bf;
+  --color-fg-3: #8a8f98;
+  --color-fg-4: #62666d;
+
+  --color-accent: #f2643a;
+  --color-accent-hover: #ff7a52;
+  --color-accent-soft: rgb(242 100 58 / 0.12);
+
+  --color-ok: #4cb782;
+  --color-warn: #f2c94c;
+  --color-danger: #eb5757;
+  --color-info: #5e9eff;
+  --color-neutral: #8a8f98;
+  --color-synthetic: #b48cff;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgb(242 100 58 / 0.35);
+  color: var(--color-fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Display headline: Linear-style white-to-grey text fill */
+.text-gradient {
+  background: linear-gradient(180deg, #f7f8f8 30%, rgb(247 248 248 / 0.55) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Faint engineering grid, faded out at the edges */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+}
+
+/* Cursor spotlight for cards; --x/--y are set from pointer position */
+.spotlight {
+  --x: 50%;
+  --y: 50%;
+}
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out-expo);
+  background: radial-gradient(360px circle at var(--x) var(--y), rgb(255 255 255 / 0.06), transparent 60%);
+}
+.spotlight::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out-expo);
+  padding: 1px;
+  background: radial-gradient(240px circle at var(--x) var(--y), rgb(242 100 58 / 0.55), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.spotlight:hover::before,
+.spotlight:hover::after {
+  opacity: 1;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

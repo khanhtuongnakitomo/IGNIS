@@ -1,0 +1,278 @@
+import { useEffect, useState } from "react";
+import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from "motion/react";
+import { challenge, features, product, track, type Owner } from "../../content/site";
+import { Icon } from "../ui/icons";
+import { CountUp, EASE, Reveal, Stagger, StaggerItem, trackSpotlight } from "../ui/motion";
+import { cx, Section } from "../ui/primitives";
+
+/* 01 — Challenge ---------------------------------------------------------- */
+
+export function Challenge() {
+  return (
+    <Section id="challenge" eyebrow="01 — Challenge" title="AMD Developer Hackathon: ACT III" intro={challenge.intro}>
+      <Stagger className="grid grid-cols-2 overflow-hidden rounded-[var(--radius-lg)] border border-line lg:grid-cols-4">
+        {challenge.stats.map((s, i) => (
+          <StaggerItem
+            key={s.label}
+            className={cx(
+              "border-line p-6 sm:p-8",
+              i % 2 === 0 && "border-r",
+              i < 2 && "border-b lg:border-b-0",
+              i === 1 && "lg:border-r",
+              i === 2 && "lg:border-r",
+            )}
+          >
+            <div className="text-[28px] leading-none font-semibold tracking-[-0.03em] text-fg sm:text-[40px] lg:text-[48px]">
+              {"prefix" in s && s.prefix}
+              <CountUp value={s.value} />
+              {"suffix" in s && <span className="text-fg-3">{s.suffix}</span>}
+            </div>
+            <div className="mt-3 text-[13px] text-fg-3">{s.label}</div>
+          </StaggerItem>
+        ))}
+      </Stagger>
+
+      <Reveal className="mt-10" delay={0.1}>
+        <p className="font-mono text-[11px] tracking-wide text-fg-4 uppercase">Judged on</p>
+        <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {challenge.criteria.map((c) => (
+            <li
+              key={c}
+              className="rounded-[var(--radius)] border border-line px-3 py-2.5 text-center text-[13px] text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+            >
+              {c}
+            </li>
+          ))}
+        </ul>
+      </Reveal>
+    </Section>
+  );
+}
+
+/* 02 — Track & problem ----------------------------------------------------- */
+
+export function Track() {
+  return (
+    <Section eyebrow="02 — Our track" title={track.title}>
+      <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+        <Reveal>
+          <blockquote className="border-l-2 border-accent pl-5">
+            <p className="text-[22px] leading-snug font-medium tracking-[-0.01em] text-fg sm:text-[26px]">
+              “{track.quote}”
+            </p>
+            <p className="mt-4 text-[15px] text-fg-2">“{track.problem}”</p>
+            <footer className="mt-4 font-mono text-[11px] text-fg-4">Track 1 brief · lablab.ai</footer>
+          </blockquote>
+        </Reveal>
+
+        <Reveal delay={0.1}>
+          <figure aria-labelledby="coverage-title">
+            <figcaption id="coverage-title" className="mb-4 flex items-baseline justify-between gap-4">
+              <span className="text-[13px] font-medium text-fg">Factory data sources named in the brief</span>
+              <span className="font-mono text-[11px] text-fg-4">IGNIS coverage</span>
+            </figcaption>
+            <CoverageChart />
+            <p className="mt-4 text-[12px] text-fg-3">Roadmap items are designed, not built.</p>
+          </figure>
+        </Reveal>
+      </div>
+
+      <Stagger className="mt-14 grid gap-3 md:grid-cols-3">
+        {track.problems.map((p, i) => (
+          <StaggerItem key={p.title} className="rounded-[var(--radius-lg)] border border-line bg-elevated p-6">
+            <div className="font-mono text-[11px] text-fg-4">0{i + 1}</div>
+            <h3 className="mt-3 text-[15px] font-semibold text-fg">{p.title}</h3>
+            <p className="mt-2 text-[14px] leading-relaxed text-fg-2">{p.body}</p>
+          </StaggerItem>
+        ))}
+      </Stagger>
+    </Section>
+  );
+}
+
+function CoverageChart() {
+  return (
+    <ul className="space-y-2.5">
+      {track.coverage.map((row, i) => (
+        <li key={row.source} className="grid grid-cols-[132px_1fr] items-center gap-3 sm:grid-cols-[160px_1fr]">
+          <span className={cx("text-[13px]", row.status === "out" ? "text-fg-4" : "text-fg-2")}>{row.source}</span>
+          <div className="relative h-8 overflow-hidden rounded-[6px] border border-line">
+            <motion.div
+              aria-hidden
+              className={cx(
+                "absolute inset-y-0 left-0 origin-left",
+                row.status === "now" && "bg-gradient-to-r from-accent/80 to-accent/40",
+                row.status === "roadmap" &&
+                  "bg-[repeating-linear-gradient(135deg,rgb(255_255_255/0.06)_0_6px,transparent_6px_12px)]",
+              )}
+              style={{ width: row.status === "out" ? "0%" : "100%" }}
+              initial={{ scaleX: 0 }}
+              whileInView={{ scaleX: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1.1, ease: EASE, delay: 0.15 + i * 0.09 }}
+            />
+            <span
+              className={cx(
+                "relative flex h-full items-center px-3 text-[12px] font-medium",
+                row.status === "now" ? "text-white" : row.status === "roadmap" ? "text-fg-2" : "text-fg-4",
+              )}
+            >
+              {row.note}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* 03 — Product -------------------------------------------------------------- */
+
+const ownerStyle: Record<Owner, string> = {
+  AI: "text-fg-3 border-line-strong",
+  CODE: "text-fg-3 border-line-strong",
+  HUMAN: "text-accent border-accent/40",
+};
+
+/** A packet of evidence travels the flow; each node lights up as it passes. */
+function useFlowProgress(count: number) {
+  const reduce = useReducedMotion();
+  const progress = useMotionValue(0);
+  const [active, setActive] = useState(-1);
+
+  useEffect(() => {
+    if (reduce) return;
+    const controls = animate(progress, [0, 1], { duration: 9, ease: "linear", repeat: Infinity, repeatDelay: 0.6 });
+    return () => controls.stop();
+  }, [progress, reduce]);
+
+  useMotionValueEvent(progress, "change", (v) => setActive(Math.min(count - 1, Math.floor(v * count))));
+  return { progress, active, reduce };
+}
+
+function FlowDiagram() {
+  const steps = product.flow;
+  const { progress, active, reduce } = useFlowProgress(steps.length);
+  const left = useTransform(progress, (v) => `${v * 100}%`);
+  const top = useTransform(progress, (v) => `${v * 100}%`);
+
+  return (
+    <div className="relative">
+      {/* horizontal rail (desktop) */}
+      <div aria-hidden className="absolute top-1/2 right-[7%] left-[7%] hidden h-px bg-line-strong lg:block">
+        {!reduce && (
+          <motion.span style={{ left }} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <span className="block h-px w-24 -translate-x-1/2 bg-gradient-to-r from-transparent via-accent to-transparent" />
+            <span className="absolute top-1/2 left-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-[0_0_14px_4px_rgb(242_100_58/0.6)]" />
+          </motion.span>
+        )}
+      </div>
+      {/* vertical rail (mobile) */}
+      <div aria-hidden className="absolute top-[6%] bottom-[6%] left-[19px] w-px bg-line-strong lg:hidden">
+        {!reduce && (
+          <motion.span
+            style={{ top }}
+            className="absolute left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-[0_0_14px_4px_rgb(242_100_58/0.6)]"
+          />
+        )}
+      </div>
+
+      <Stagger className="relative grid gap-3 lg:grid-cols-7 lg:gap-3">
+        {steps.map((s, i) => {
+          const lit = reduce || i === active;
+          return (
+            <StaggerItem key={s.label} className="flex items-center gap-4 lg:block">
+              <span
+                aria-hidden
+                className={cx(
+                  "relative z-10 grid size-10 shrink-0 place-items-center rounded-full border bg-bg font-mono text-[11px] transition-colors duration-500 lg:hidden",
+                  lit ? "border-accent text-accent" : "border-line-strong text-fg-3",
+                )}
+              >
+                {i + 1}
+              </span>
+              <div
+                className={cx(
+                  "relative z-10 flex-1 rounded-[var(--radius)] border bg-elevated px-3 py-3.5 transition-[border-color,box-shadow,background-color] duration-500 lg:min-h-[104px]",
+                  lit && !reduce
+                    ? "border-accent/60 bg-card shadow-[0_0_0_4px_rgb(242_100_58/0.08),0_12px_32px_-12px_rgb(242_100_58/0.5)]"
+                    : "border-line",
+                )}
+              >
+                <span
+                  className={cx(
+                    "inline-block rounded-[4px] border px-1.5 py-px font-mono text-[10px] font-medium tracking-wider",
+                    ownerStyle[s.owner],
+                  )}
+                >
+                  {s.owner}
+                </span>
+                <div className="mt-2.5 text-[13px] leading-snug font-medium text-fg">{s.label}</div>
+              </div>
+            </StaggerItem>
+          );
+        })}
+      </Stagger>
+    </div>
+  );
+}
+
+export function Product() {
+  return (
+    <Section id="product" eyebrow="03 — Product" title={product.title} intro={product.intro}>
+      <Reveal>
+        <FlowDiagram />
+      </Reveal>
+      <Reveal className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] text-fg-3" delay={0.1}>
+        <span className="flex items-center gap-2">
+          <span className="rounded-[4px] border border-line-strong px-1.5 font-mono text-[10px]">AI</span> proposes
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="rounded-[4px] border border-line-strong px-1.5 font-mono text-[10px]">CODE</span> computes
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="rounded-[4px] border border-accent/40 px-1.5 font-mono text-[10px] text-accent">HUMAN</span>{" "}
+          approves
+        </span>
+      </Reveal>
+      <Reveal className="mt-10 max-w-2xl" delay={0.15}>
+        <p className="text-[14px] leading-relaxed text-fg-3">
+          {product.analogy}{" "}
+          <a
+            href={product.analogyHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-fg-2 underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg hover:decoration-fg-3"
+          >
+            Architecture explained <Icon name="external" size={12} />
+          </a>
+        </p>
+      </Reveal>
+    </Section>
+  );
+}
+
+/* Features ------------------------------------------------------------------ */
+
+export function Features() {
+  return (
+    <Section eyebrow="Core features" title="Six building blocks, one workflow">
+      <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {features.map((f) => (
+          <StaggerItem key={f.title}>
+            <article
+              onPointerMove={trackSpotlight}
+              className="spotlight group relative h-full overflow-hidden rounded-[var(--radius-lg)] border border-line bg-elevated p-6 transition-colors duration-300 hover:bg-card"
+            >
+              <div className="relative grid size-9 place-items-center rounded-[var(--radius)] border border-line-strong bg-bg text-fg-2 transition-colors duration-300 group-hover:border-accent/50 group-hover:text-accent">
+                <Icon name={f.icon} />
+              </div>
+              <h3 className="relative mt-5 text-[15px] font-semibold text-fg">{f.title}</h3>
+              <p className="relative mt-2 text-[14px] leading-relaxed text-fg-2">{f.body}</p>
+            </article>
+          </StaggerItem>
+        ))}
+      </Stagger>
+    </Section>
+  );
+}
