@@ -12,7 +12,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from ignis_wo.documents.contracts import CandidateChunk, DocumentArtifact
-from ignis_wo.hashing import content_hash
+from ignis_wo.hashing import content_hash, sha256_text
 
 
 class DocumentReview(BaseModel):
@@ -29,6 +29,7 @@ class DocumentReview(BaseModel):
     asset_model: str = Field(min_length=1)
     component: str = Field(min_length=1)
     approved_passage_ids: list[str] = Field(min_length=1)
+    approved_text_sha256: dict[str, str]
     corrections: dict[str, str] = {}
 
 
@@ -59,13 +60,14 @@ def review_artifact(directory: Path, reviewer: str, reason: str, asset_model: st
     unapproved = sorted(set(corrections) - set(approved))
     if unapproved:
         raise ValueError(f"corrections given for passages that are not approved: {unapproved}")
+    reviewed_text = {chunk.passage_id: sha256_text(chunk.text) for chunk in chunks if chunk.passage_id in approved}
     reviewed_at = datetime.datetime.now(datetime.UTC).isoformat()
     review = DocumentReview(
         review_id="DR-" + content_hash([artifact.artifact_id, reviewer, reviewed_at])[:12], reviewer=reviewer,
         reason=reason, reviewed_at=reviewed_at, synthetic=synthetic, artifact_id=artifact.artifact_id,
         document_id=artifact.source.document_id, revision=artifact.source.revision,
         source_sha256=artifact.source.sha256, asset_model=asset_model, component=component,
-        approved_passage_ids=approved, corrections=corrections)
+        approved_passage_ids=approved, approved_text_sha256=reviewed_text, corrections=corrections)
     (directory / "review.json").write_text(review.model_dump_json(indent=2), encoding="utf-8")
     return review
 
@@ -91,9 +93,11 @@ def reviewed_items(directory: Path) -> tuple[DocumentReview, list[dict]]:
     artifact, chunks = read_artifact(directory)
     if artifact.artifact_id != review.artifact_id:
         raise ValueError(f"{directory}: review.json belongs to another artifact")
-    approved = set(review.approved_passage_ids)
-    items = [corpus_item(chunk, review, artifact.source.file_name) for chunk in chunks if chunk.passage_id in approved]
-    return review, items
+    approved = [chunk for chunk in chunks if chunk.passage_id in set(review.approved_passage_ids)]
+    current = {chunk.passage_id: sha256_text(chunk.text) for chunk in approved}
+    if current != review.approved_text_sha256:
+        raise ValueError(f"{directory}: the chunk text differs from the reviewed text; review it again")
+    return review, [corpus_item(chunk, review, artifact.source.file_name) for chunk in approved]
 
 
 def applicability_graph(reviews: list[DocumentReview], assets: dict[str, str]) -> dict:

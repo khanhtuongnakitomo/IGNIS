@@ -47,6 +47,14 @@ class Workflow:
         self.explanation_provider = explanation_provider
         self.corpus_sources = corpus_sources
 
+    def report_extraction_identity(self, run: dict) -> dict:
+        """Runs saved before extraction_identity was recorded fall back to what their adapter mode implies."""
+        if run.get("extraction_identity"):
+            return run["extraction_identity"]
+        if run["adapter_mode"] == "fixture":
+            return self.extraction_identity("fixture")
+        return {"model_id": "unavailable", "model_version": "none", "configuration": "not applicable"}
+
     def extraction_identity(self, adapter_mode: str) -> dict:
         """Recorded when extraction runs, so the report names the model that actually produced the suggestions."""
         if adapter_mode == "fixture":
@@ -333,8 +341,7 @@ class Workflow:
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f"{report_id}.pdf"
         from ignis_wo.hashing import sha256_bytes
-        unavailable = {"model_id": "unavailable", "model_version": "none", "configuration": "not applicable"}
-        extraction = run.get("extraction_identity") or unavailable
+        extraction = self.report_extraction_identity(run)
         context = run.get("context") or {}
         sources = [{"passage_id": passage["passage_id"], "document_id": passage["document_id"], "version": passage["version"],
                     "location": passage["location"], "source_sha256": passage.get("source_sha256", "")[:16], "reader": (passage.get("reader") or {}).get("reader", "fixture")}

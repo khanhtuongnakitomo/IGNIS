@@ -5,8 +5,8 @@ from pathlib import Path
 
 from sample_data import pdf_bytes, sample_items
 
-from ignis_wo.documents.corpus import load_corpus_snapshot, publish_corpus, review_artifact
-from ignis_wo.documents.ingest import ingest_document
+from ignis_wo.documents.corpus import load_corpus_snapshot, publish_corpus, read_artifact, review_artifact
+from ignis_wo.documents.ingest import ingest_document, write_outputs
 from ignis_wo.extraction.adapters import FixtureAdapter
 from ignis_wo.extraction.suggest import suggest_all
 from ignis_wo.workflow.context import retrieve
@@ -62,6 +62,26 @@ class ReviewTests(CorpusTestCase):
         (directory / "artifact.json").write_text(json.dumps(artifact), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "missing pages"):
             review_artifact(directory, "A. Engineer", "reason", "PX-100", "seal")
+
+
+class ReviewedTextTests(CorpusTestCase):
+    def test_text_changed_after_review_blocks_publish_and_reingest(self):
+        directory = self.approved("MAN-1", SEAL_TEXT)
+        artifact, chunks = read_artifact(directory)
+        changed = [chunk.model_copy(update={"text": "Replace the seal now."}) for chunk in chunks]
+        data = next(directory.glob("original*")).read_bytes()
+        with self.assertRaisesRegex(ValueError, "new reading differs"):
+            write_outputs(directory, data, artifact, changed)
+        lines = [json.dumps(chunk.model_dump(mode="json"), sort_keys=True) for chunk in changed]
+        (directory / "chunks.jsonl").write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "differs from the reviewed text"):
+            publish_corpus([directory], {"PUMP-SYN-01": "PX-100"}, self.root / "corpus.json")
+
+    def test_an_identical_reingest_of_a_reviewed_document_is_allowed(self):
+        directory = self.approved("MAN-1", SEAL_TEXT)
+        artifact, chunks = read_artifact(directory)
+        write_outputs(directory, next(directory.glob("original*")).read_bytes(), artifact, chunks)
+        self.assertEqual(len(self.snapshot([directory])[0]["documents"]), len(chunks))
 
 
 class PublishTests(CorpusTestCase):
@@ -160,6 +180,12 @@ class WorkflowCorpusTests(CorpusTestCase):
         self.assertEqual(report["extraction_identity"]["configuration"], "not the scored configuration")
         self.assertEqual(report["corpus_mode"], "reviewed_snapshot")
         self.assertTrue(Path(report["path"]).exists())
+
+    def test_fixture_runs_saved_before_identity_recording_keep_their_fixture_model(self):
+        workflow = Workflow(self.root / "state.sqlite3", self.root / "workflow", sample_items())
+        identity = workflow.report_extraction_identity({"adapter_mode": "fixture"})
+        self.assertEqual((identity["model_id"], identity["model_version"]), ("fixture-gold", "maintie-gold-demo"))
+        self.assertEqual(workflow.report_extraction_identity({"adapter_mode": "unavailable"})["model_id"], "unavailable")
 
     def test_rebuilding_with_another_corpus_gives_a_new_pack_and_clears_the_draft(self):
         first_sources = self.snapshot([self.approved("MAN-1", SEAL_TEXT)], "first.json")
