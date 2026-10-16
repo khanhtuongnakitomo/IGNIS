@@ -1,10 +1,12 @@
 import json
 import tempfile
 import unittest
+from xml.etree import ElementTree
 from pathlib import Path
 
 from mock_chat_server import ScriptedServer, chat_reply, reply
 
+from ignis_wo.evaluation.charts import grouped_bars
 from ignis_wo.evaluation.explanation_benchmark import (
     load_scenarios,
     run_family,
@@ -166,6 +168,16 @@ class JobBudgetTests(unittest.TestCase):
         summary = budget.summary()
         self.assertEqual(summary["outcomes"], {"ok": 1, "unavailable": 1})
         self.assertEqual(summary["quota_last"], {"x-ratelimit-remaining-user-daily-usd": "0.8"})
+
+
+class ChartTests(unittest.TestCase):
+    def test_grouped_bars_parse_and_mark_missing_values(self):
+        svg = grouped_bars("Quality & speed", ["a", "b"], {"Model <1>": [50.0, None], "Model 2": [10.0, 20.0]}, "%", 100)
+        root = ElementTree.fromstring(svg)
+        titles = [element.text for element in root.iter("{http://www.w3.org/2000/svg}title")]
+        self.assertEqual(len(titles), 3)
+        self.assertIn("n/a", svg)
+        self.assertIn("prefers-color-scheme: dark", svg)
 
 
 class ReplayServingTests(unittest.TestCase):

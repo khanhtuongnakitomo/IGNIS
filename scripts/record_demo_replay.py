@@ -48,10 +48,12 @@ def run_demo(directory: Path, extraction_provider, explanation_provider) -> dict
     state = workflow.extract(run["run_id"], state["revision"])
     if state["stage_status"].get("extraction") != "succeeded":
         raise SystemExit(f"extraction did not succeed: {state.get('stage_errors')}")
+    usable = {suggestion["record_id"] for suggestion in state["suggestions"] if suggestion["output"]}
     for record in state["records"]:
-        state = workflow.review(run["run_id"], state["revision"], record["record_id"], "accepted",
-                                "Hosted extraction shown for the replay package", reviewer="SYNTHETIC DEMO SIMULATOR",
-                                demo_auto_review=True)
+        decision = "accepted" if record["record_id"] in usable else "rejected"
+        state = workflow.review(run["run_id"], state["revision"], record["record_id"], decision,
+                                f"SYNTHETIC replay package: {decision} without human review",
+                                reviewer="SYNTHETIC DEMO SIMULATOR")
     criticality = [{"component": "seal", "value": 3, "reason": "Synthetic demo policy value", "set_by": "synthetic"}]
     state = workflow.analyze(run["run_id"], state["revision"], criticality)
     state = workflow.build_context(run["run_id"], state["revision"], "PUMP-SYN-01", "seal", "seal leakage flush")

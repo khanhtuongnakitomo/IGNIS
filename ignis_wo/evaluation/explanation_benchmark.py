@@ -9,6 +9,7 @@ automatically: it goes to a blind human rating sheet.
 import csv
 import json
 import random
+import re
 import time
 from pathlib import Path
 
@@ -17,6 +18,8 @@ from ignis_wo.hashing import sha256_text
 from ignis_wo.hosted.transport import STOP_KINDS, ProviderError
 from ignis_wo.workflow.context import retrieve
 
+IDENTIFIER = re.compile(r"\b[A-Z]+-\d+\b")
+DIGIT_TOKEN = re.compile(r"\S*\d\S*")
 SCENARIOS = Path(__file__).resolve().parents[2] / "docs" / "benchmarks" / "scenarios" / "pump_scenarios.json"
 LOCK = SCENARIOS.with_name("scenario_lock.json")
 
@@ -47,7 +50,22 @@ def claim_citations(draft: dict, labels: tuple[str, ...]) -> set[str]:
     claims = [claim for label in labels for claim in draft.get(label) or []]
     if "inspection" in labels and draft.get("inspection"):
         claims.append(draft["inspection"])
-    return {citation for claim in claims for citation in claim.get("citations", [])}
+    """Malformed claims (e.g. bare strings) cite nothing; the validator already rejects them."""
+    return {citation for claim in claims if isinstance(claim, dict) for citation in claim.get("citations") or []}
+
+
+def prose_texts(draft: dict) -> list[str]:
+    claims = [*(draft.get("hypotheses") or []), *(draft.get("alternatives") or []), draft.get("inspection")]
+    texts = [claim.get("text", "") if isinstance(claim, dict) else str(claim or "") for claim in claims]
+    return [*texts, draft.get("uncertainty") or ""]
+
+
+def only_identifier_digits(draft: dict, errors: list[str]) -> bool:
+    """Diagnostic: the sole error is the number rule, and every digit sits in an identifier such as PX-100."""
+    if errors != ["numbers in prose must be rendered from typed fact slots"]:
+        return False
+    stripped = [IDENTIFIER.sub("", text) for text in prose_texts(draft)]
+    return not any(DIGIT_TOKEN.search(text) for text in stripped)
 
 
 def scored_row(family: dict, model_id: str, retrieved: dict, draft: dict | None, attempts: list[dict]) -> dict:
@@ -74,6 +92,7 @@ def scored_row(family: dict, model_id: str, retrieved: dict, draft: dict | None,
             "support_hit": None if abstain_expected else bool(hypotheses & set(expected["supporting_passages"])),
             "distractor_cited": bool(cited & set(expected["distractor_passages"])) if expected["distractor_passages"] else None,
             "number_violation": any("numbers in prose" in error for error in row["final_errors"]),
+            "only_identifier_digits": only_identifier_digits(draft, row["final_errors"]),
             "draft": draft}
 
 
@@ -106,6 +125,7 @@ def summarize_model(rows: list[dict]) -> dict:
             "first_pass_valid": rate(rows, "first_pass_valid"), "valid_after_repair": rate(rows, "valid"),
             "outcome_correct": rate(rows, "outcome_correct"), "support_hit": rate(rows, "support_hit"),
             "distractor_cited": rate(rows, "distractor_cited"),
+            "invalid_only_for_identifier_digits": sum(bool(row.get("only_identifier_digits")) for row in rows),
             "wrong_model_in_pack": sum(bool(row["wrong_model_in_pack"]) for row in rows),
             "budget_fallback_used": sum(row["budget_fallback"] for row in rows),
             "model_seconds_p50": percentile(latencies, 50), "model_seconds_p95": percentile(latencies, 95),
@@ -113,11 +133,17 @@ def summarize_model(rows: list[dict]) -> dict:
             "tokens_per_valid_output": round(tokens / len(valid), 1) if valid else None}
 
 
+def described(label: str, claim) -> str:
+    if not isinstance(claim, dict):
+        return f"{label} (malformed): {claim}"
+    return f"{label}: {claim.get('text', '')} [{', '.join(claim.get('citations') or [])}]"
+
+
 def claim_text(draft: dict) -> str:
-    parts = [f"Hypothesis: {claim['text']} [{', '.join(claim['citations'])}]" for claim in draft["hypotheses"]]
-    parts += [f"Alternative: {claim['text']} [{', '.join(claim['citations'])}]" for claim in draft["alternatives"]]
+    parts = [described("Hypothesis", claim) for claim in draft.get("hypotheses") or []]
+    parts += [described("Alternative", claim) for claim in draft.get("alternatives") or []]
     if draft.get("inspection"):
-        parts.append(f"Inspection: {draft['inspection']['text']} [{', '.join(draft['inspection']['citations'])}]")
+        parts.append(described("Inspection", draft["inspection"]))
     parts.append(f"Uncertainty: {draft['uncertainty']}; abstain: {draft['abstain']}")
     return "\n".join(parts)
 

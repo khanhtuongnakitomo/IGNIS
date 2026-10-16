@@ -73,6 +73,7 @@ def read_file(entry: dict, arguments, client, cache: ParseCache, directory: Path
 def read(arguments) -> dict:
     lock = json.loads((PILOT / "lock.json").read_text(encoding="utf-8"))
     directory = PILOT / f"read-{arguments.reader}"
+    directory.mkdir(parents=True, exist_ok=True)
     job = JobBudget(f"stage1-{arguments.reader}", arguments.max_attempts, arguments.max_seconds)
     client = ocr_client(arguments, job, directory)
     cache = ParseCache(directory / "cache")
@@ -89,7 +90,6 @@ def read(arguments) -> dict:
                 if error.kind in ("job_budget", "credits", "auth"):
                     break
         passes[label] = rows
-    directory.mkdir(parents=True, exist_ok=True)
     for label, rows in passes.items():
         lines = [json.dumps(row, sort_keys=True) for row in rows]
         (directory / f"{label}.jsonl").write_text("".join(line + "\n" for line in lines), encoding="utf-8")

@@ -21,10 +21,13 @@ from ignis_wo.evaluation.benchmark import percentile, run_cases  # noqa: E402
 from ignis_wo.evaluation.explanation_benchmark import (  # noqa: E402
     load_scenarios,
     run_family,
+    scenario_pack,
+    scored_row,
     summarize_model,
 )
 from ignis_wo.evaluation.jobs import JobBudget  # noqa: E402
 from ignis_wo.evaluation.reader_benchmark import FAMILIES  # noqa: E402
+from ignis_wo.extraction.adapters import ReplayMiss  # noqa: E402
 from ignis_wo.hosted.explanation import HostedExplanationProvider  # noqa: E402
 from ignis_wo.hosted.pacing import RequestPacer  # noqa: E402
 from ignis_wo.hosted.providers import client_from_environment  # noqa: E402
@@ -101,12 +104,52 @@ def runtime_summary(rows: list[dict], wall_seconds: float) -> dict:
             "queue_and_pacing_p50": percentile(waits, 50), "n": len(finished)}
 
 
+def read_rows(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def rescored_row(family: dict, provider, case_id: str, live: dict) -> dict:
+    try:
+        row = run_family(family, provider)
+    except ReplayMiss as error:
+        row = {**scored_row(family, provider.model_id, scenario_pack(family), None, []), "error": "not_recorded",
+               "message": str(error)}
+    return {**row, "case_id": case_id, "wall_seconds": live.get("wall_seconds"), "live_status": live.get("status", "ok")}
+
+
+def rescore(arguments, directory: Path, families: list[dict]) -> int:
+    """Re-scores a finished job from its recordings with no API call; live timings come from the job's rows."""
+    live_path = directory / "rows.live.jsonl"
+    if not live_path.exists():
+        (directory / "rows.jsonl").replace(live_path)
+    live_rows = {row["case_id"]: row for row in read_rows(live_path)}
+    rows = []
+    for model in arguments.models:
+        provider = HostedExplanationProvider(None, model, reasoning_effort="low", max_tokens=4096, budget_fallback=True,
+                                             replay_path=directory / f"{model}-replay.jsonl")
+        for index, family in enumerate(families):
+            case_id = f"{family['family_id']}:{model}:{index}"
+            rows.append(rescored_row(family, provider, case_id, live_rows.get(case_id, {})))
+    lines = [json.dumps(row, sort_keys=True) for row in rows]
+    (directory / "rows.jsonl").write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+    summary = json.loads((directory / "summary.json").read_text(encoding="utf-8"))
+    summary["models"] = {model: summarize_model([row for row in rows if row["model_id"] == model])
+                         for model in arguments.models}
+    summary["runtime"] = runtime_summary(rows, summary["runtime"]["wall_seconds"])
+    summary["rescored_from_recordings"] = True
+    (directory / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(json.dumps({key: summary[key] for key in ("models", "runtime")}, indent=2))
+    return 0
+
+
 def main() -> int:
     arguments = parse_arguments()
     name = f"{arguments.stage}-{'+'.join(arguments.models)}"
     if arguments.stage == "runtime":
         name += f"-c{arguments.concurrency}"
     directory = RESULTS / name
+    if arguments.rescore:
+        return rescore(arguments, directory, stage_families(arguments.stage))
     if arguments.stage == "heldout" and (directory / "summary.json").exists():
         raise SystemExit("the held-out scenarios were already run once for these models; they are not re-run")
     directory.mkdir(parents=True, exist_ok=True)
@@ -138,6 +181,7 @@ def parse_arguments():
     parser.add_argument("--max-attempts", type=int, default=40)
     parser.add_argument("--max-seconds", type=float, default=1800)
     parser.add_argument("--allowance-reserve", type=float, default=0.25)
+    parser.add_argument("--rescore", action="store_true", help="re-score a finished job from its recordings, no calls")
     return parser.parse_args()
 
 

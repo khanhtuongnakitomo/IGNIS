@@ -11,7 +11,7 @@ from pathlib import Path
 from ignis_wo.extraction.adapters import ReplayMiss
 from ignis_wo.hashing import sha256_text
 from ignis_wo.hosted.prompts import EXPLANATION_SCHEMA, ExplanationPrompt
-from ignis_wo.hosted.transport import budget_label, parse_json_content
+from ignis_wo.hosted.transport import ChatResult, budget_label, parse_json_content
 from ignis_wo.workflow.context import validate_draft
 
 TASK = "ignis-explanation-v1"
@@ -65,8 +65,14 @@ def load_responses(replay_path: Path) -> dict[str, dict]:
     for line in replay_path.read_text(encoding="utf-8").splitlines():
         if line.strip():
             row = json.loads(line)
-            responses[row["key"]] = row["response"]
+            responses[row["key"]] = row
     return responses
+
+
+def replayed_result(row: dict) -> ChatResult:
+    """The recorded call's timing and usage, so replayed attempts report what the live call measured."""
+    return ChatResult("", None, row.get("finish_reason"), row.get("usage") or {}, {}, row.get("latency_seconds"), 0,
+                      row.get("request_parameters") or {})
 
 
 class HostedExplanationProvider:
@@ -118,12 +124,12 @@ class HostedExplanationProvider:
         return sha256_text("|".join(parts))
 
     def reduced_draft(self, pack: dict, messages: list[dict], attempt: int):
-        """Returns (reduced answer, ChatResult); the result is None when replayed."""
+        """Returns (reduced answer, ChatResult); a replayed result carries the recorded timing and usage."""
         key = self.replay_key(pack, attempt)
         if self.responses is not None:
             if key not in self.responses:
                 raise ReplayMiss(f"no recorded explanation for pack {pack['pack_id']} attempt {attempt}")
-            return self.responses[key], None
+            return self.responses[key]["response"], replayed_result(self.responses[key])
         schema = EXPLANATION_SCHEMA if self.output_mode == "json_schema" else None
         result = self.client.complete(self.model_id, messages, self.output_mode, schema, self.reasoning_effort,
                                       self.max_tokens, budget_fallback=self.budget_fallback)
