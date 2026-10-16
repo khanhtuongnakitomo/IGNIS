@@ -28,8 +28,9 @@ class ParseCache:
         return DocumentArtifact.model_validate_json(path.read_text(encoding="utf-8"))
 
     def store(self, artifact: DocumentArtifact) -> bool:
-        """Only artifacts with some text are kept, so an empty or failed read is never served as a hit."""
-        if not has_text(artifact):
+        """Only complete artifacts with some text are kept: an empty, failed or partial read is never served
+        as a hit, so reading it again retries OCR instead of returning the same missing pages."""
+        if artifact.status != "complete" or not has_text(artifact):
             return False
         self.directory.mkdir(parents=True, exist_ok=True)
         path = self.path_for(artifact.artifact_id)

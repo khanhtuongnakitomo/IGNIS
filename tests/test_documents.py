@@ -142,6 +142,14 @@ class CacheTests(DocumentTestCase):
         self.assertEqual(len(server.requests), 3)
         self.assertNotEqual(artifact_key("s", [0], native_identity()), artifact_key("s", [0, 1], native_identity()))
 
+    def test_a_partial_read_is_not_cached_and_is_read_again(self):
+        path = self.write("manual.pdf", pdf_bytes(["one", "two"]))
+        with ScriptedServer([ocr_reply(0)]) as server:
+            for _ in range(2):
+                artifact, _, _ = ingest_document(path, "MAN-1", 1, "mineru", self.out, ocr_client=ocr_client(server),
+                                                 cache=self.cache)
+        self.assertEqual((artifact.status, artifact.mode, len(server.requests)), ("partial", "hosted_live", 2))
+
     def test_failed_and_empty_reads_are_not_cached(self):
         path = self.write("a.pdf", pdf_bytes(["one"]))
         with ScriptedServer([reply({"pages": []})]) as server, self.assertRaises(ProviderError):
