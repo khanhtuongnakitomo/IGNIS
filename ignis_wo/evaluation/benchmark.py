@@ -16,6 +16,7 @@ from pathlib import Path
 from ignis_wo.evaluation.scorer import entity_set, micro_scores, relation_set
 from ignis_wo.extraction.adapters import gold_item_to_output
 from ignis_wo.extraction.validate import validate_output
+from ignis_wo.hosted.frozen import load_frozen_config
 from ignis_wo.hosted.transport import RECORD_LEVEL_KINDS, STOP_KINDS, ProviderError
 
 TEST_LEDGER = Path("outputs/eval_ledger.jsonl")
@@ -152,3 +153,19 @@ def ledger_contains(ledger: Path, model_id: str, model_version: str) -> bool:
         if same_configuration and entry.get("complete", True):
             return True
     return False
+
+
+def matches_scored_entry(adapter, scored: dict) -> bool:
+    legacy_model_version = getattr(adapter, "legacy_model_version", None)
+    if legacy_model_version is None:
+        return False
+    same_budget = adapter.max_tokens == scored["max_tokens"] and adapter.budget_fallback == scored["budget_fallback"]
+    return adapter.model_id == scored["model_id"] and legacy_model_version() == scored["model_version"] and same_budget
+
+
+def already_scored(ledger: Path, adapter, scored: dict | None = None) -> bool:
+    """True when the local ledger or the committed frozen configuration says this setup was scored on test.
+    The committed entry guards machines whose local ledger does not have the run."""
+    if ledger_contains(ledger, adapter.model_id, adapter.model_version):
+        return True
+    return matches_scored_entry(adapter, scored or load_frozen_config()["scored_as"])

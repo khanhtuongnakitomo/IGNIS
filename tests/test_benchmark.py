@@ -7,6 +7,7 @@ from mock_chat_server import ScriptedServer, chat_reply, reply
 from sample_data import sample_items
 
 from ignis_wo.evaluation.benchmark import (
+    already_scored,
     extraction_call,
     extraction_cases,
     extraction_scores,
@@ -50,6 +51,24 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(summary["attempted_per_minute"], 4.0)
         self.assertEqual(summary["valid_per_minute"], 2.0)
         self.assertEqual(summary["prompt_tokens"], 4)
+
+    def test_a_rejected_budget_stops_the_remaining_cases(self):
+        def call(case):
+            raise ProviderError("budget_rejected", "max_tokens exceeds the maximum output tokens allowed")
+
+        rows, _ = run_cases([{"case_id": "a"}, {"case_id": "b"}], call)
+        self.assertEqual([row["status"] for row in rows], ["budget_rejected", "skipped"])
+
+    def test_the_committed_scored_entry_refuses_the_test_split_without_a_local_ledger(self):
+        prompt = ExtractionPrompt(select_examples(sample_items(), count=2))
+        adapter = LiveAdapter(None, "M", prompt, reasoning_effort=None)
+        scored = {"model_id": "M", "model_version": adapter.legacy_model_version(), "max_tokens": 4096,
+                  "budget_fallback": False}
+        missing_ledger = Path(tempfile.gettempdir()) / "no-such-ledger.jsonl"
+        self.assertTrue(already_scored(missing_ledger, adapter, scored))
+        with_fallback = LiveAdapter(None, "M", prompt, reasoning_effort=None, budget_fallback=True)
+        self.assertFalse(already_scored(missing_ledger, with_fallback, scored))
+        self.assertFalse(already_scored(missing_ledger, LiveAdapter(None, "N", prompt, reasoning_effort=None), scored))
 
     def test_cases_past_the_time_budget_are_skipped(self):
         ticks = iter([0, 0, 1, 100, 100, 100])
