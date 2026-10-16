@@ -7,7 +7,7 @@ from typing import Protocol
 
 from ignis_wo.hashing import sha256_text
 from ignis_wo.hosted.prompts import EXTRACTION_SCHEMA, ExtractionPrompt
-from ignis_wo.hosted.transport import ChatClient, parse_json_content
+from ignis_wo.hosted.transport import ChatClient, ProviderError, parse_json_content
 
 TASK = "maintie-ie-v1"
 
@@ -81,17 +81,25 @@ class ReplayAdapter:
         self.model_id = model_id
         self.model_version = model_version
         self.responses = {}
+        self.failures = {}
         for line in replay_path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
             row = json.loads(line)
             if row["model_id"] == model_id and row["model_version"] == model_version:
                 self.responses[row["input_hash"]] = row["response"]
+                self.failures.pop(row["input_hash"], None)
+                if row.get("provider_error"):
+                    self.failures[row["input_hash"]] = row["provider_error"]
 
     def extract(self, text_norm: str):
+        """A record that failed live fails again the same way, so replay reproduces the run."""
         key = input_hash(text_norm)
         if key not in self.responses:
             raise ReplayMiss(f"no recorded response for input {key[:12]} and {self.model_id}@{self.model_version}")
+        failure = self.failures.get(key)
+        if failure:
+            raise ProviderError(failure["kind"], f"replayed: {failure['message']}")
         return self.responses[key]
 
 
@@ -154,6 +162,12 @@ def token_spans_to_output(raw: dict, text_norm: str) -> tuple[dict, int]:
     return {"entities": entities, "relations": raw.get("relations") or []}, reanchored
 
 
+def require_lists(raw: dict) -> None:
+    for key in ("entities", "relations"):
+        if raw.get(key) is not None and not isinstance(raw[key], list):
+            raise ProviderError("invalid_response", f"'{key}' is not a list")
+
+
 class LiveAdapter:
     """Hosted extraction through the AMD chat API. The model returns token spans; code converts them."""
 
@@ -186,22 +200,31 @@ class LiveAdapter:
     def extract_with_result(self, text_norm: str):
         schema = EXTRACTION_SCHEMA if self.output_mode == "json_schema" else None
         messages = self.prompt.messages(text_norm)
-        result = self.client.complete(self.model_id, messages, self.output_mode, schema, self.reasoning_effort,
-                                      self.max_tokens)
-        raw = parse_json_content(result.content)
+        try:
+            result = self.client.complete(self.model_id, messages, self.output_mode, schema, self.reasoning_effort,
+                                          self.max_tokens)
+            raw = parse_json_content(result.content)
+            require_lists(raw)
+        except ProviderError as error:
+            if error.record_level:
+                self.record_failure(text_norm, error)
+            raise
         response, reanchored = token_spans_to_output(raw, text_norm)
         self.record(text_norm, raw, response, result, reanchored)
         return response, result, reanchored
 
+    def record_failure(self, text_norm: str, error: ProviderError) -> None:
+        message = str(error).removeprefix(f"{error.kind}: ")
+        self.write_row({**self.row_identity(text_norm), "response": None,
+                        "provider_error": {"kind": error.kind, "message": message}})
+
+    def row_identity(self, text_norm: str) -> dict:
+        return {"input_hash": input_hash(text_norm), "model_id": self.model_id, "model_version": self.model_version,
+                "prompt_id": self.prompt.prompt_id, "output_mode": self.output_mode}
+
     def record(self, text_norm: str, raw: dict, response: dict, result, reanchored: int) -> None:
-        if self.record_path is None:
-            return
         row = {
-            "input_hash": input_hash(text_norm),
-            "model_id": self.model_id,
-            "model_version": self.model_version,
-            "prompt_id": self.prompt.prompt_id,
-            "output_mode": self.output_mode,
+            **self.row_identity(text_norm),
             "raw": raw,
             "response": response,
             "spans_reanchored": reanchored,
@@ -210,5 +233,10 @@ class LiveAdapter:
             "latency_seconds": result.latency_seconds,
             "request_parameters": result.request_parameters,
         }
+        self.write_row(row)
+
+    def write_row(self, row: dict) -> None:
+        if self.record_path is None:
+            return
         with self.lock, self.record_path.open("a", encoding="utf-8") as file:
             file.write(json.dumps(row, sort_keys=True) + "\n")

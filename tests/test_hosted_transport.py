@@ -114,6 +114,12 @@ class ErrorTests(unittest.TestCase):
     def test_timeout_is_not_retried(self):
         self.assert_failure([reply(chat_reply("{}"), delay=0.6)], "timeout", timeout_seconds=0.2)
 
+    def test_dropped_connection_is_an_outage_and_retried(self):
+        with ScriptedServer([reply(None, drop=True), reply(chat_reply("{}"))]) as server:
+            result = client_for(server).complete("m", MESSAGES)
+        self.assertEqual(result.attempts, 2)
+        self.assert_failure([reply(None, drop=True)], "unavailable", requests=3)
+
     def test_reply_without_choices_is_invalid(self):
         self.assert_failure([reply({"object": "chat.completion"})], "invalid_response")
 
@@ -163,6 +169,14 @@ class PacerTests(unittest.TestCase):
         with pacer.slot():
             pass
         self.assertEqual(clock.sleeps, [60.0])
+
+    def test_a_rate_limit_pauses_every_caller_of_the_pacer(self):
+        clock = FakeClock()
+        pacer = RequestPacer(requests_per_minute=60, clock=clock, sleep=clock.sleep)
+        limited = reply({"error": {"message": "Rate limit exceeded"}}, 429, {"Retry-After": "5"})
+        with ScriptedServer([limited]) as server, self.assertRaises(ProviderError):
+            ChatClient(server.base_url, KEY, pacer=pacer, max_attempts=1).complete("m", MESSAGES)
+        self.assertEqual(pacer.next_start, 5.0)
 
     def test_pacer_is_used_by_the_client(self):
         clock = FakeClock()

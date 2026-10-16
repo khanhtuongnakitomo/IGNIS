@@ -41,5 +41,9 @@ class RequestPacer:
         except ValueError:
             exhausted = False
         if exhausted:
-            with self.lock:
-                self.next_start = max(self.next_start, self.clock() + 60.0)
+            self.pause(60.0)
+
+    def pause(self, seconds: float) -> None:
+        """Holds every caller of this pacer, e.g. after a 429 from the shared key."""
+        with self.lock:
+            self.next_start = max(self.next_start, self.clock() + seconds)

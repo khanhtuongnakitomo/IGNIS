@@ -6,7 +6,9 @@ from pathlib import Path
 from mock_chat_server import ScriptedServer, chat_reply, reply
 from sample_data import build_sample_records, sample_items
 
+from ignis_wo.__main__ import main
 from ignis_wo.contracts import ExtractionOutput
+from ignis_wo.evaluation.scorer import score_items
 from ignis_wo.extraction.adapters import LiveAdapter, ReplayAdapter, ReplayMiss, gold_item_to_output, token_spans_to_output
 from ignis_wo.extraction.project import project
 from ignis_wo.extraction.suggest import suggest
@@ -111,6 +113,25 @@ class AdapterTests(unittest.TestCase):
         self.assertIn("start_token", schema["properties"]["entities"]["items"]["properties"])
 
 
+class LiveFailureTests(unittest.TestCase):
+    def test_a_wrongly_shaped_answer_fails_only_that_record(self):
+        with ScriptedServer([reply(chat_reply('{"entities": 3}'))]) as server:
+            live = LiveAdapter(ChatClient(server.base_url), "DeepSeek-V4-Flash")
+            suggestion = suggest(build_sample_records()[0], live)
+        self.assertEqual(suggestion.status, "failed_terminal")
+        self.assertTrue(suggestion.errors[0].startswith("provider_error: invalid_response"))
+
+    def test_a_record_that_failed_live_replays_as_the_same_failure(self):
+        record = build_sample_records()[0]
+        with tempfile.TemporaryDirectory() as directory, ScriptedServer([reply(chat_reply("not json"))]) as server:
+            record_path = Path(directory) / "replay.jsonl"
+            live = LiveAdapter(ChatClient(server.base_url), "DeepSeek-V4-Flash", record_path=record_path)
+            live_suggestion = suggest(record, live)
+            replayed = suggest(record, ReplayAdapter(record_path, "DeepSeek-V4-Flash", live.model_version))
+        self.assertEqual((replayed.status, replayed.suggestion_id), ("failed_terminal", live_suggestion.suggestion_id))
+        self.assertTrue(replayed.errors[0].startswith("provider_error: invalid_response: replayed"))
+
+
 class TokenSpanTests(unittest.TestCase):
     def test_multi_token_span_is_end_exclusive(self):
         raw = {"entities": [{"id": "e0", "type": "PhysicalObject", "start_token": 1, "end_token": 3, "text": "conveyor belt"}]}
@@ -168,6 +189,39 @@ class SuggestFailureTests(unittest.TestCase):
         for kind in ("rate_limited", "unavailable", "timeout", "auth", "credits"):
             with self.assertRaises(ProviderError):
                 suggest(self.record(), FailingAdapter(kind))
+
+
+class ScorerFailureTests(unittest.TestCase):
+    def test_outages_raise_instead_of_scoring_as_empty(self):
+        for kind in ("rate_limited", "unavailable", "timeout", "bad_request"):
+            with self.assertRaises(ProviderError):
+                score_items(sample_items(), FailingAdapter(kind))
+
+    def test_bad_answers_count_as_empty_predictions(self):
+        result = score_items(sample_items(), FailingAdapter("invalid_response"))
+        self.assertEqual(result["provider_failures"], {"invalid_response": len(sample_items())})
+        self.assertEqual(result["entities"]["correct"], 0)
+
+
+class EvalLedgerTests(unittest.TestCase):
+    def run_final(self, directory: Path, model_id: str):
+        replay = directory / "replay.jsonl"
+        replay.write_text("", encoding="utf-8")
+        main(["eval", "--split", "test", "--final", "--mode", "replay", "--replay", str(replay), "--model-id", model_id,
+              "--model-version", "v", "--ledger", str(directory / "ledger.jsonl"), "--gold", str(directory / "none.json")])
+
+    def test_a_scored_model_is_refused_but_another_model_is_not(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            ledger.write_text(json.dumps({"model_id": "a", "model_version": "v"}) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "refused"):
+                self.run_final(Path(directory), "a")
+            with self.assertRaises(FileNotFoundError):
+                self.run_final(Path(directory), "b")
+
+    def test_replay_without_a_model_id_is_refused(self):
+        with self.assertRaisesRegex(SystemExit, "replay mode needs"):
+            main(["eval", "--mode", "replay", "--replay", "unused.jsonl", "--model-id", ""])
 
 
 class ProjectionTests(unittest.TestCase):

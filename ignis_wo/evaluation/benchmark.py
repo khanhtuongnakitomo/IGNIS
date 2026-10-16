@@ -16,7 +16,10 @@ from pathlib import Path
 from ignis_wo.evaluation.scorer import entity_set, micro_scores, relation_set
 from ignis_wo.extraction.adapters import gold_item_to_output
 from ignis_wo.extraction.validate import validate_output
-from ignis_wo.hosted.transport import STOP_KINDS, ProviderError
+from ignis_wo.hosted.transport import RECORD_LEVEL_KINDS, STOP_KINDS, ProviderError
+
+TEST_LEDGER = Path("outputs/eval_ledger.jsonl")
+SCORED_OUTCOMES = RECORD_LEVEL_KINDS | {"valid", "invalid"}
 
 
 def percentile(values: list[float], percent: float) -> float | None:
@@ -43,6 +46,8 @@ def run_cases(cases: list[dict], call, concurrency: int = 1, max_duration_second
             row = {"status": error.kind, "error": str(error), "http_status": error.status}
             if error.kind in STOP_KINDS:
                 stop.set()
+        except Exception as error:  # noqa: BLE001 - one broken case must not lose rows already paid for
+            row = {"status": "error", "error": f"{type(error).__name__}: {error}"}
         row["case_id"] = case["case_id"]
         row["wall_seconds"] = round(clock() - began, 3)
         row.setdefault("latency_seconds", None)
@@ -130,13 +135,20 @@ def write_results(directory: Path, rows: list[dict], summary: dict) -> None:
     (directory / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def run_complete(summary: dict) -> bool:
+    """Only a run where every case got a model answer may lock the test split for its configuration."""
+    return summary["skipped"] == 0 and set(summary["outcomes"]) <= SCORED_OUTCOMES
+
+
 def ledger_contains(ledger: Path, model_id: str, model_version: str) -> bool:
+    """Entries marked incomplete are kept for audit but do not lock the configuration."""
     if not ledger.exists():
         return False
     for line in ledger.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         entry = json.loads(line)
-        if entry.get("model_id") == model_id and entry.get("model_version") == model_version:
+        same_configuration = entry.get("model_id") == model_id and entry.get("model_version") == model_version
+        if same_configuration and entry.get("complete", True):
             return True
     return False

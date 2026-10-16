@@ -16,11 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from ignis_wo.evaluation.benchmark import (  # noqa: E402
+    TEST_LEDGER,
     extraction_call,
     extraction_cases,
     extraction_scores,
     ledger_contains,
     run_cases,
+    run_complete,
     summarize,
     write_results,
 )
@@ -47,7 +49,7 @@ def parse_arguments():
     parser.add_argument("--requests-per-minute", type=float, default=20)
     parser.add_argument("--max-duration", type=float, default=600, help="seconds before remaining cases are skipped")
     parser.add_argument("--final", action="store_true", help="required for the single test-split run")
-    parser.add_argument("--ledger", type=Path, default=ROOT / "outputs" / "benchmarks" / "test_ledger.jsonl")
+    parser.add_argument("--ledger", type=Path, default=ROOT / TEST_LEDGER)
     parser.add_argument("--out", type=Path, default=ROOT / "outputs" / "benchmarks")
     return parser.parse_args()
 
@@ -65,7 +67,6 @@ def main() -> int:
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
     run_name = f"{stamp}-{arguments.split}-{re.sub(r'[^A-Za-z0-9.-]', '_', arguments.model)}"
     run_directory = arguments.out / run_name
-    run_directory.mkdir(parents=True, exist_ok=True)
 
     pacer = RequestPacer(arguments.requests_per_minute, arguments.concurrency)
     client = client_from_environment(pacer=pacer)
@@ -73,6 +74,7 @@ def main() -> int:
                           arguments.max_tokens, record_path=run_directory / "replay.jsonl")
     if arguments.split == "test" and ledger_contains(arguments.ledger, adapter.model_id, adapter.model_version):
         raise SystemExit("test split refused: this model configuration was already scored")
+    run_directory.mkdir(parents=True, exist_ok=True)
 
     cases = extraction_cases(items)
     rows, wall_seconds = run_cases(cases, extraction_call(adapter), arguments.concurrency, arguments.max_duration)
@@ -90,7 +92,10 @@ def main() -> int:
     if arguments.split == "test":
         arguments.ledger.parent.mkdir(parents=True, exist_ok=True)
         with arguments.ledger.open("a", encoding="utf-8") as file:
-            file.write(json.dumps({**summary["configuration"], "run": run_name}) + "\n")
+            entry = {**summary["configuration"], "run": run_name, "complete": run_complete(summary)}
+            file.write(json.dumps(entry) + "\n")
+        if not entry["complete"]:
+            print("test run incomplete (skipped cases or provider failures): logged, not locked; rerun when stable")
     print(json.dumps(summary, indent=2, sort_keys=True))
     print(f"results: {run_directory}")
     return 0

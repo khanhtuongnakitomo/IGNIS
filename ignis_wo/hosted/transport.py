@@ -5,6 +5,7 @@ and https://amd-aim.github.io/radeon-cloud-docs/api/errors/. The final answer is
 `message.content` only; `message.reasoning` is kept separately and never parsed as output.
 """
 
+import http.client
 import json
 import random
 import re
@@ -206,7 +207,12 @@ class ChatClient:
         if self.pacer is None:
             return self.timed_open(request)
         with self.pacer.slot():
-            reply, response_headers, latency = self.timed_open(request)
+            try:
+                reply, response_headers, latency = self.timed_open(request)
+            except ProviderError as error:
+                if error.kind == "rate_limited":
+                    self.pacer.pause(error.retry_after or 60.0)
+                raise
         self.pacer.observe(response_headers)
         return reply, response_headers, latency
 
@@ -231,6 +237,8 @@ class ChatClient:
             if isinstance(error.reason, TimeoutError):
                 raise ProviderError("timeout", f"no reply within {self.timeout_seconds}s") from None
             raise ProviderError("unavailable", f"connection failed ({error.reason})") from None
+        except (http.client.HTTPException, ConnectionError) as error:
+            raise ProviderError("unavailable", f"connection dropped ({type(error).__name__})") from None
         try:
             return json.loads(raw), headers
         except (json.JSONDecodeError, UnicodeDecodeError):

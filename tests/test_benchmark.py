@@ -13,6 +13,7 @@ from ignis_wo.evaluation.benchmark import (
     ledger_contains,
     percentile,
     run_cases,
+    run_complete,
     summarize,
     write_results,
 )
@@ -63,6 +64,28 @@ class RunnerTests(unittest.TestCase):
             ledger.write_text(json.dumps({"model_id": "m", "model_version": "v"}) + "\n", encoding="utf-8")
             self.assertTrue(ledger_contains(ledger, "m", "v"))
             self.assertFalse(ledger_contains(ledger, "m", "other-prompt"))
+            self.assertFalse(ledger_contains(ledger, "other-model", "v"))
+
+    def test_an_incomplete_test_run_is_logged_but_does_not_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            ledger.write_text(json.dumps({"model_id": "m", "model_version": "v", "complete": False}) + "\n",
+                              encoding="utf-8")
+            self.assertFalse(ledger_contains(ledger, "m", "v"))
+        complete = {"skipped": 0, "outcomes": {"valid": 3, "invalid": 1, "truncated": 1}}
+        self.assertTrue(run_complete(complete))
+        self.assertFalse(run_complete({**complete, "skipped": 1}))
+        self.assertFalse(run_complete({**complete, "outcomes": {"valid": 3, "rate_limited": 1}}))
+
+    def test_an_unexpected_exception_fails_one_case_and_keeps_the_rest(self):
+        def call(case):
+            if case["case_id"] == "b":
+                raise TypeError("'int' object is not iterable")
+            return {"status": "valid"}
+
+        rows, _ = run_cases([{"case_id": "a"}, {"case_id": "b"}, {"case_id": "c"}], call)
+        self.assertEqual([row["status"] for row in rows], ["valid", "error", "valid"])
+        self.assertIn("TypeError", rows[1]["error"])
 
 
 class ExtractionBenchmarkTests(unittest.TestCase):

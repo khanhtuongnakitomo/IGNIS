@@ -14,8 +14,9 @@ def chat_reply(content, finish_reason="stop", reasoning=None, usage=None) -> dic
     return {"choices": [choice], "usage": usage or {"prompt_tokens": 10, "completion_tokens": 5}}
 
 
-def reply(body, status=200, headers=None, delay=0.0) -> dict:
-    return {"body": body, "status": status, "headers": headers or {}, "delay": delay}
+def reply(body, status=200, headers=None, delay=0.0, drop=False) -> dict:
+    """`drop` closes the connection without answering, like a gateway reset."""
+    return {"body": body, "status": status, "headers": headers or {}, "delay": delay, "drop": drop}
 
 
 class ScriptedServer:
@@ -35,6 +36,9 @@ class ScriptedServer:
                 planned = scripted.replies.pop(0) if len(scripted.replies) > 1 else scripted.replies[0]
                 if planned["delay"]:
                     time.sleep(planned["delay"])
+                if planned["drop"]:
+                    self.close_connection = True
+                    return
                 payload = planned["body"]
                 data = payload.encode("utf-8") if isinstance(payload, str) else json.dumps(payload).encode("utf-8")
                 self.send_response(planned["status"])

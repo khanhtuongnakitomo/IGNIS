@@ -4,7 +4,7 @@ from collections import Counter
 
 from ignis_wo.extraction.adapters import ExtractionAdapter, gold_item_to_output
 from ignis_wo.extraction.validate import validate_output
-from ignis_wo.hosted.transport import STOP_KINDS, ProviderError
+from ignis_wo.hosted.transport import ProviderError
 
 
 def truncate_type(type_path: str, depth: int | None) -> str:
@@ -71,7 +71,7 @@ def score_items(
         try:
             raw_prediction = adapter.extract(text_norm)
         except ProviderError as error:
-            if error.kind in STOP_KINDS:
+            if not error.record_level:
                 raise
             provider_failures[error.kind] += 1
             raw_prediction, failed = None, True
