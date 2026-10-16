@@ -262,6 +262,8 @@ class ChatClient:
                                      temperature)
         policy = {"max_tokens_policy": budget_policy(max_tokens, budget_fallback),
                   "effective_max_tokens": effective_tokens}
+        if uses_default and max_tokens is not None:
+            policy["budget_fallback"] = {"remembered": True}
         try:
             result = self.post_chat(parameters, policy)
         except ProviderError as error:

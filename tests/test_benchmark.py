@@ -70,6 +70,27 @@ class RunnerTests(unittest.TestCase):
         self.assertFalse(already_scored(missing_ledger, with_fallback, scored))
         self.assertFalse(already_scored(missing_ledger, LiveAdapter(None, "N", prompt, reasoning_effort=None), scored))
 
+    def test_a_local_v1_entry_locks_the_same_model_and_budget(self):
+        prompt = ExtractionPrompt(select_examples(sample_items(), count=2))
+        adapter = LiveAdapter(None, "N", prompt, reasoning_effort=None)
+        other_scored = {"model_id": "M", "model_version": "x", "max_tokens": 4096, "budget_fallback": False}
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            ledger.write_text(json.dumps({"model_id": "N", "model_version": adapter.legacy_model_version()}) + "\n",
+                              encoding="utf-8")
+            self.assertTrue(already_scored(ledger, adapter, other_scored))
+            smaller_budget = LiveAdapter(None, "N", prompt, reasoning_effort=None, max_tokens=2048)
+            self.assertFalse(already_scored(ledger, smaller_budget, other_scored))
+
+    def test_the_capability_scan_continues_past_a_rejected_budget(self):
+        models = [{"id": "Model-A", "json_output": True}, {"id": "Model-B", "json_output": True}]
+        rejected = reply({"error": {"message": "The requested max_tokens (1024) exceeds the maximum output tokens "
+                                               "allowed for model Model-A (null)"}}, 400)
+        script = [reply({"data": models}), rejected, reply(chat_reply('{"status": "ok"}'))]
+        with ScriptedServer(script) as server:
+            matrix = capability_matrix(ChatClient(server.base_url, "rc-x"))
+        self.assertEqual([row["status"] for row in matrix["probes"]], ["budget_rejected", "ok"])
+
     def test_cases_past_the_time_budget_are_skipped(self):
         ticks = iter([0, 0, 1, 100, 100, 100])
         rows, _ = run_cases([{"case_id": "a"}, {"case_id": "b"}], lambda case: {"status": "valid"},

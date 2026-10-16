@@ -179,6 +179,7 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(first.request_parameters["budget_fallback"]["rejected_max_tokens"], 4096)
         self.assertIsNone(first.request_parameters["effective_max_tokens"])
         self.assertEqual(second.request_parameters["max_tokens_policy"], "explicit_with_fallback")
+        self.assertEqual(second.request_parameters["budget_fallback"], {"remembered": True})
 
     def test_other_bad_requests_never_trigger_the_fallback(self):
         unknown = reply({"error": {"message": "Unknown parameter: foo"}}, 400)
