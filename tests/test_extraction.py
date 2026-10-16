@@ -1,16 +1,17 @@
 import json
 import tempfile
-import threading
 import unittest
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-from sample_data import sample_items
+from mock_chat_server import ScriptedServer, chat_reply, reply
+from sample_data import build_sample_records, sample_items
 
 from ignis_wo.contracts import ExtractionOutput
-from ignis_wo.extraction.adapters import LiveAdapter, ReplayAdapter, ReplayMiss, gold_item_to_output
+from ignis_wo.extraction.adapters import LiveAdapter, ReplayAdapter, ReplayMiss, gold_item_to_output, token_spans_to_output
 from ignis_wo.extraction.project import project
+from ignis_wo.extraction.suggest import suggest
 from ignis_wo.extraction.validate import validate_output
+from ignis_wo.hosted.transport import ChatClient, ProviderError
 
 VALID = {
     "entities": [
@@ -83,40 +84,90 @@ class AdapterTests(unittest.TestCase):
             with self.assertRaises(ReplayMiss):
                 adapter.extract("pump noisy")
 
-    def test_live_adapter_sends_json_schema_and_records_replay(self):
-        received = {}
+    def test_live_adapter_converts_token_spans_and_records_replay(self):
+        token_form = {"entities": [{"id": "e0", "type": "PhysicalObject/DrivingObject", "start_token": 0, "end_token": 1, "text": "pump"},
+                                   {"id": "e1", "type": "Property/UndesirableProperty", "start_token": 1, "end_token": 2, "text": "noisy"}],
+                      "relations": [{"head": "e1", "tail": "e0", "type": "hasParticipant/hasPatient"}]}
+        with tempfile.TemporaryDirectory() as directory, ScriptedServer([reply(chat_reply(json.dumps(token_form)))]) as server:
+            record_path = Path(directory) / "replay.jsonl"
+            live = LiveAdapter(ChatClient(server.base_url, "rc-secret"), "DeepSeek-V4-Flash", record_path=record_path)
+            self.assertEqual(live.extract("pump noisy"), VALID)
+            replay = ReplayAdapter(record_path, "DeepSeek-V4-Flash", live.model_version)
+            self.assertEqual(replay.extract("pump noisy"), VALID)
+            recorded = record_path.read_text(encoding="utf-8")
+        body = server.requests[0]["body"]
+        self.assertEqual(body["model"], "DeepSeek-V4-Flash")
+        self.assertEqual(body["temperature"], 0)
+        self.assertEqual(body["response_format"], {"type": "json_object"})
+        self.assertIn("[0] pump [1] noisy", body["messages"][-1]["content"])
+        self.assertTrue(live.model_version.startswith("extraction-instruction-v1-"))
+        self.assertNotIn("rc-secret", recorded)
 
-        class Handler(BaseHTTPRequestHandler):
-            def do_POST(self):
-                length = int(self.headers["Content-Length"])
-                received.update(json.loads(self.rfile.read(length)))
-                reply = {"choices": [{"message": {"content": json.dumps(VALID)}}]}
-                body = json.dumps(reply).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(body)
+    def test_live_adapter_sends_the_token_schema_in_json_schema_mode(self):
+        with ScriptedServer([reply(chat_reply('{"entities": [], "relations": []}'))]) as server:
+            live = LiveAdapter(ChatClient(server.base_url), "MiMo-V2.6-Flash", output_mode="json_schema")
+            self.assertEqual(live.extract("pump noisy"), {"entities": [], "relations": []})
+        schema = server.requests[0]["body"]["response_format"]["json_schema"]["schema"]
+        self.assertIn("start_token", schema["properties"]["entities"]["items"]["properties"])
 
-            def log_message(self, *arguments):
-                pass
 
-        server = HTTPServer(("127.0.0.1", 0), Handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            with tempfile.TemporaryDirectory() as directory:
-                record_path = Path(directory) / "replay.jsonl"
-                base_url = f"http://127.0.0.1:{server.server_port}/v1"
-                live = LiveAdapter(base_url, "maintie-lora", "v1", record_path=record_path)
-                self.assertEqual(live.extract("pump noisy"), VALID)
-                replay = ReplayAdapter(record_path, "maintie-lora", "v1")
-                self.assertEqual(replay.extract("pump noisy"), VALID)
-        finally:
-            server.shutdown()
-            server.server_close()
-        self.assertEqual(received["model"], "maintie-lora")
-        self.assertEqual(received["temperature"], 0)
-        self.assertEqual(received["response_format"]["type"], "json_schema")
+class TokenSpanTests(unittest.TestCase):
+    def test_multi_token_span_is_end_exclusive(self):
+        raw = {"entities": [{"id": "e0", "type": "PhysicalObject", "start_token": 1, "end_token": 3, "text": "conveyor belt"}]}
+        output, reanchored = token_spans_to_output(raw, "check conveyor belt tension")
+        self.assertEqual((output["entities"][0]["start"], output["entities"][0]["end"], reanchored), (6, 19, 0))
+
+    def test_off_by_one_indices_are_reanchored_on_the_echoed_text(self):
+        raw = {"entities": [{"id": "e0", "type": "PhysicalObject", "start_token": 0, "end_token": 1, "text": "depth counter"},
+                            {"id": "e1", "type": "State", "start_token": False, "end_token": 1, "text": "unserviceable"}]}
+        output, reanchored = token_spans_to_output(raw, "depth counter unserviceable")
+        self.assertEqual([(entity["start"], entity["end"]) for entity in output["entities"]], [(0, 13), (14, 27)])
+        self.assertEqual(reanchored, 2)
+
+    def test_repeated_text_anchors_nearest_the_declared_index(self):
+        raw = {"entities": [{"id": "e0", "type": "PhysicalObject", "start_token": 3, "end_token": 5, "text": "pump"}]}
+        output, _ = token_spans_to_output(raw, "pump seal and pump leak")
+        self.assertEqual(output["entities"][0]["start"], 14)
+
+    def test_out_of_range_span_is_rejected_by_the_validator_not_raised(self):
+        raw = {"entities": [{"id": "e0", "type": "PhysicalObject/DrivingObject", "start_token": 1, "end_token": 5, "text": "motor"}], "relations": []}
+        output, _ = token_spans_to_output(raw, "pump noisy")
+        validated, errors = validate_output(output, "pump noisy")
+        self.assertIsNone(validated)
+        self.assertTrue(any("out of bounds" in error for error in errors), errors)
+
+    def test_echoed_text_absent_from_the_source_is_rejected(self):
+        raw = {"entities": [{"id": "e0", "type": "PhysicalObject/DrivingObject", "start_token": 1, "end_token": 2, "text": "motor"}], "relations": []}
+        validated, errors = validate_output(token_spans_to_output(raw, "pump noisy")[0], "pump noisy")
+        self.assertIsNone(validated)
+        self.assertTrue(any("does not match" in error for error in errors), errors)
+
+
+class FailingAdapter:
+    mode = "live"
+    model_id = "m"
+    model_version = "v"
+
+    def __init__(self, kind):
+        self.kind = kind
+
+    def extract(self, text_norm):
+        raise ProviderError(self.kind, "scripted failure")
+
+
+class SuggestFailureTests(unittest.TestCase):
+    def record(self):
+        return build_sample_records()[0]
+
+    def test_a_bad_answer_fails_only_that_record(self):
+        suggestion = suggest(self.record(), FailingAdapter("truncated"))
+        self.assertEqual(suggestion.status, "failed_terminal")
+        self.assertTrue(suggestion.errors[0].startswith("provider_error: truncated"))
+
+    def test_rate_limits_outages_and_auth_raise_so_the_stage_can_be_retried(self):
+        for kind in ("rate_limited", "unavailable", "timeout", "auth", "credits"):
+            with self.assertRaises(ProviderError):
+                suggest(self.record(), FailingAdapter(kind))
 
 
 class ProjectionTests(unittest.TestCase):

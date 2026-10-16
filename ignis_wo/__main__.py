@@ -11,6 +11,8 @@ from ignis_wo.contracts import ComponentCriticality
 from ignis_wo.evaluation.maintie import load_gold, load_verified_splits
 from ignis_wo.evaluation.scorer import score_items
 from ignis_wo.extraction.adapters import FixtureAdapter, LiveAdapter, ReplayAdapter
+from ignis_wo.hosted.pacing import RequestPacer
+from ignis_wo.hosted.transport import DEFAULT_BASE_URL, ChatClient
 from ignis_wo.pipeline import RunOptions, run_pipeline
 from ignis_wo.workflow.api import serve
 from ignis_wo.workflow.service import Workflow
@@ -30,20 +32,20 @@ def make_adapter(arguments):
         return FixtureAdapter(load_gold(arguments.gold))
     if arguments.mode == "replay":
         return ReplayAdapter(arguments.replay, arguments.model_id, arguments.model_version)
-    base_url = arguments.base_url or os.environ.get("MODEL_BASE_URL")
-    if not base_url:
-        raise SystemExit("live mode needs --base-url or MODEL_BASE_URL")
-    api_key = os.environ.get("MODEL_API_KEY")
-    return LiveAdapter(base_url, arguments.model_id, arguments.model_version, api_key, arguments.record)
+    if not arguments.model_id:
+        raise SystemExit("live mode needs --model-id or MODEL_NAME")
+    base_url = arguments.base_url or os.environ.get("MODEL_BASE_URL") or DEFAULT_BASE_URL
+    client = ChatClient(base_url, os.environ.get("MODEL_API_KEY"), pacer=RequestPacer())
+    return LiveAdapter(client, arguments.model_id, record_path=arguments.record)
 
 
 def add_adapter_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--mode", choices=["fixture", "replay", "live"], default="fixture")
     parser.add_argument("--gold", type=Path, default=DEFAULT_GOLD, help="MaintIE-format gold file: fixture outputs and eval labels")
     parser.add_argument("--replay", type=Path, help="recorded JSONL responses for replay mode")
-    parser.add_argument("--model-id", default=os.environ.get("MODEL_NAME", "maintie-lora"))
-    parser.add_argument("--model-version", default="unversioned")
-    parser.add_argument("--base-url", help="OpenAI-compatible endpoint for live mode; the key comes from MODEL_API_KEY")
+    parser.add_argument("--model-id", default=os.environ.get("MODEL_NAME"))
+    parser.add_argument("--model-version", default="unversioned", help="replay mode only; live mode derives it from the prompt")
+    parser.add_argument("--base-url", help="hosted endpoint for live mode (default MODEL_BASE_URL, then the AMD API); the key comes from MODEL_API_KEY")
     parser.add_argument("--record", type=Path, help="append live responses to this replay file")
 
 
