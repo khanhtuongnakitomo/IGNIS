@@ -148,6 +148,8 @@ def main() -> int:
     if arguments.stage == "runtime":
         name += f"-c{arguments.concurrency}"
     directory = RESULTS / name
+    if arguments.rescore and arguments.stage in ("repeat", "runtime"):
+        raise SystemExit("--rescore cannot separate repeated runs of one scenario; their live rows are the record")
     if arguments.rescore:
         return rescore(arguments, directory, stage_families(arguments.stage))
     if arguments.stage == "heldout" and (directory / "summary.json").exists():

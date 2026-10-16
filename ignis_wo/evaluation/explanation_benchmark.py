@@ -47,10 +47,10 @@ def scenario_pack(family: dict) -> dict:
 
 
 def claim_citations(draft: dict, labels: tuple[str, ...]) -> set[str]:
+    """Malformed claims (e.g. bare strings) cite nothing; the validator already rejects them."""
     claims = [claim for label in labels for claim in draft.get(label) or []]
     if "inspection" in labels and draft.get("inspection"):
         claims.append(draft["inspection"])
-    """Malformed claims (e.g. bare strings) cite nothing; the validator already rejects them."""
     return {citation for claim in claims if isinstance(claim, dict) for citation in claim.get("citations") or []}
 
 
@@ -106,7 +106,7 @@ def run_family(family: dict, provider, clock=time.monotonic) -> dict:
         except ProviderError as error:
             if error.kind in STOP_KINDS:
                 raise
-            row = scored_row(family, provider.model_id, retrieved, None, attempts)
+            row = scored_row(family, provider.model_id, retrieved, None, getattr(error, "attempts", []))
             return {**row, "error": error.kind, "message": str(error), "full_path_seconds": round(clock() - began, 3)}
     row = scored_row(family, provider.model_id, retrieved, draft, attempts)
     return {**row, "full_path_seconds": round(clock() - began, 3)}

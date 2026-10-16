@@ -107,7 +107,7 @@ Both models used the same packs, `json_object`, reasoning `low`, a 4096-token bu
 - **Spent and discarded:**
   - One OCR call was spent before its recording folder existed. Fixed, then re-run.
   - Two aborted demo-replay recordings spent 12 extraction calls. The causes were the review step and a rejected suggestion. Those recordings are kept outside the package.
-- **Scoring bug, fixed without new calls.** The first DeepSeek dev pass hit a scoring bug on malformed claims. It was re-scored from its recordings with `--rescore`, and live timings were kept.
+- **Scoring bug, fixed without new calls.** The first DeepSeek dev pass hit a scoring bug on malformed claims. It was re-scored from its recordings with `--rescore`, and live timings were kept. That dev job has no repeated scenarios. Re-scoring is now refused for the repeat and runtime stages, because their replay keys cannot tell repeats apart; those stages report their live rows.
 
 ## Replay package and rehearsal (for #17 and #19)
 

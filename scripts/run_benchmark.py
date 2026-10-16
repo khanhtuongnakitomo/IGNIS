@@ -66,6 +66,9 @@ def main() -> int:
         raise SystemExit("set MODEL_NAME in .env or pass --model")
     if arguments.split == "test" and not arguments.final:
         raise SystemExit("the test split is locked; pass --final only after the configuration is frozen on dev")
+    needed = arguments.limit + 10
+    if arguments.final and arguments.max_attempts < needed:
+        raise SystemExit(f"the single test run must not stop part way: pass --max-attempts {needed} or more")
     splits = load_verified_splits(arguments.gold)
     items = splits[arguments.split][arguments.offset:arguments.offset + arguments.limit]
     examples = select_examples(splits["train"], arguments.examples) if arguments.prompt == "fewshot" else []

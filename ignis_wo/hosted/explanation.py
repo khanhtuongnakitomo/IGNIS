@@ -11,7 +11,12 @@ from pathlib import Path
 from ignis_wo.extraction.adapters import ReplayMiss
 from ignis_wo.hashing import sha256_text
 from ignis_wo.hosted.prompts import EXPLANATION_SCHEMA, ExplanationPrompt
-from ignis_wo.hosted.transport import ChatResult, budget_label, parse_json_content
+from ignis_wo.hosted.transport import (
+    ChatResult,
+    ProviderError,
+    budget_label,
+    parse_json_content,
+)
 from ignis_wo.workflow.context import validate_draft
 
 TASK = "ignis-explanation-v1"
@@ -99,13 +104,18 @@ class HostedExplanationProvider:
 
     def draft_with_attempts(self, pack: dict) -> tuple[dict, list[dict]]:
         """Also returns each attempt's validation errors, latency and usage, so first-pass and
-        after-repair validity can be measured separately."""
+        after-repair validity can be measured separately. A failed call keeps the earlier attempts
+        on the raised ProviderError as `attempts`."""
         if not bindable_facts(pack) and not pack["passages"]:
             return abstain_draft(pack), []
         messages = self.prompt.messages(pack)
         attempts = []
         for attempt in range(self.repair_attempts + 1):
-            reduced, result = self.reduced_draft(pack, messages, attempt)
+            try:
+                reduced, result = self.reduced_draft(pack, messages, attempt)
+            except ProviderError as error:
+                error.attempts = attempts
+                raise
             draft = assemble_draft(pack, reduced)
             errors = validate_draft(pack, draft)
             attempts.append({"attempt": attempt, "errors": errors,

@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from xml.etree import ElementTree
@@ -20,6 +22,9 @@ from ignis_wo.evaluation.reader_benchmark import FAMILIES, family_files, normali
 from ignis_wo.hosted.explanation import HostedExplanationProvider
 from ignis_wo.hosted.providers import replay_providers
 from ignis_wo.hosted.transport import ChatClient, ChatResult, Gateway, ProviderError
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class FakeClock:
@@ -131,6 +136,17 @@ class ExplanationScoringTests(unittest.TestCase):
             run_family(self.families["S01"], Failing("job_budget"))
         self.assertEqual(run_family(self.families["S01"], Failing("timeout"))["error"], "timeout")
 
+    def test_a_failed_repair_keeps_the_earlier_attempt(self):
+        class RepairTimesOut(ScriptedClient):
+            def complete(self, *arguments, **options):
+                if not self.answers:
+                    raise ProviderError("timeout", "no reply")
+                return super().complete(*arguments, **options)
+
+        first = answer(["S01-MAN"], text="Seal leakage is the first issue.")
+        row = run_family(self.families["S01"], HostedExplanationProvider(RepairTimesOut(first), "m"))
+        self.assertEqual((row["error"], row["calls"], row["model_seconds"], row["prompt_tokens"]), ("timeout", 1, 0.5, 10))
+
     def test_the_blind_sheet_hides_model_names(self):
         rows = [run_family(self.families["S01"], HostedExplanationProvider(ScriptedClient(answer(["S01-MAN"])), name))
                 for name in ("Model-A", "Model-B")]
@@ -168,6 +184,19 @@ class JobBudgetTests(unittest.TestCase):
         summary = budget.summary()
         self.assertEqual(summary["outcomes"], {"ok": 1, "unavailable": 1})
         self.assertEqual(summary["quota_last"], {"x-ratelimit-remaining-user-daily-usd": "0.8"})
+
+
+class CommandGuardTests(unittest.TestCase):
+    def run_script(self, *arguments):
+        command = [sys.executable, str(ROOT / "scripts" / arguments[0]), *arguments[1:]]
+        return subprocess.run(command, capture_output=True, text=True, cwd=ROOT, check=False)
+
+    def test_a_final_run_with_too_few_attempts_is_refused_before_any_call(self):
+        result = self.run_script("run_benchmark.py", "--split", "test", "--final", "--model", "m", "--limit", "108")
+        self.assertIn("--max-attempts 118", result.stderr)
+
+    def test_rescoring_repeated_runs_is_refused(self):
+        self.assertIn("cannot separate repeated runs", self.run_script("benchmark_explanations.py", "repeat", "--rescore").stderr)
 
 
 class ChartTests(unittest.TestCase):
