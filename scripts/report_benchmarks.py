@@ -3,6 +3,7 @@
 Run with: uv run --no-project --with-requirements requirements-dev.txt python scripts/report_benchmarks.py --extraction-runs <run dir> <run dir>
 Writes results.json (every number the docs cite), SVG charts, the frozen manifest and the blind rating
 sheet. The rating key stays in outputs/ so raters cannot see model names. No API call is made.
+Jobs named with a prompt suffix (e.g. -v2) are charted as their own series and kept out of the v1 blind sheet.
 """
 
 import argparse
@@ -19,9 +20,11 @@ from ignis_wo.evaluation.charts import grouped_bars  # noqa: E402
 from ignis_wo.evaluation.explanation_benchmark import load_scenarios, write_blind_sheet  # noqa: E402
 from ignis_wo.evaluation.reader_benchmark import FAMILIES  # noqa: E402
 from ignis_wo.hosted.frozen import load_frozen_config  # noqa: E402
+from ignis_wo.hosted.prompts import ExplanationPrompt  # noqa: E402
 
 RUNS = ROOT / "outputs" / "benchmarks" / "23"
 DOCS = ROOT / "docs" / "benchmarks"
+V1_PROMPT_ID = ExplanationPrompt("v1").prompt_id
 
 
 def read_json(path: Path):
@@ -66,6 +69,7 @@ def explanation_results() -> dict:
         if (directory / "summary.json").exists():
             summary = read_json(directory / "summary.json")
             results[directory.name] = {key: summary.get(key) for key in ("stage", "concurrency", "models", "runtime", "job")}
+            results[directory.name]["prompt_ids"] = summary.get("prompt_ids") or dict.fromkeys(summary["models"], V1_PROMPT_ID)
     return results
 
 
@@ -105,14 +109,14 @@ def charts(results: dict) -> dict[str, str]:
         metrics = [("first_pass_valid", "First-pass valid"), ("valid_after_repair", "Valid after repair"),
                    ("outcome_correct", "Support/abstain right"), ("support_hit", "Cites expected passage")]
         series = {}
-        for run in dev.values():
+        for name, run in dev.items():
             for model, summary in run["models"].items():
-                series[model] = [percent(summary[key]) for key, _ in metrics]
+                series[series_label(name, model)] = [percent(summary[key]) for key, _ in metrics]
         output["explanation-dev-quality.svg"] = grouped_bars(
             "Explanation on 12 dev scenarios (synthetic, drafted by Yoshio)", [label for _, label in metrics], series,
             "%", 100, note="n = 12 each; Qwen's 2 timeouts are absent from the last two bars; validity counts the no-digits rule")
-        latency = {model: [summary["model_seconds_p50"], summary["model_seconds_p95"]]
-                   for run in dev.values() for model, summary in run["models"].items()}
+        latency = {series_label(name, model): [summary["model_seconds_p50"], summary["model_seconds_p95"]]
+                   for name, run in dev.items() for model, summary in run["models"].items()}
         output["explanation-dev-latency.svg"] = grouped_bars("Explanation model time per scenario, dev (seconds)",
                                                              ["p50", "p95"], latency, " s",
                                                              note="Includes repair calls; n = 12 per model; preliminary tails")
@@ -129,6 +133,15 @@ def charts(results: dict) -> dict[str, str]:
     return output
 
 
+def series_label(run_name: str, model: str) -> str:
+    return f"{model} (v2)" if run_name.endswith("-v2") else model
+
+
+def rated_run(run_name: str) -> bool:
+    """The blind sheet holds the v1 dev and held-out drafts; later prompt versions are rated separately."""
+    return run_name.startswith(("dev-", "heldout-")) and not run_name.endswith("-v2")
+
+
 def manifest(results: dict) -> dict:
     commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=ROOT, check=True).stdout.strip()
     pilot = read_json(RUNS / "reader-pilot" / "lock.json")
@@ -140,6 +153,7 @@ def manifest(results: dict) -> dict:
             "scenarios": {"sha256": lock["sha256"], "dev": lock["dev"], "heldout": lock["heldout"],
                           "status": "drafted by Yoshio, pending Tuong review"},
             "extraction": {key: frozen[key] for key in ("model_id", "model_version", "prompt_id", "max_tokens")},
+            "explanation_prompts": {name: run["prompt_ids"] for name, run in results["explanation"].items()},
             "explanation_settings": {"reasoning_effort": "low", "max_tokens": 4096, "budget_fallback": True,
                                      "output_mode": "json_object", "repair_attempts": 1},
             "reader": {"model_id": "MinerU2.5-Pro", "endpoint": "/ocr", "parser_version": "document-parse-v1"},
@@ -154,7 +168,7 @@ def blind_sheet() -> int:
     families = {family["family_id"]: family for family in load_scenarios()}
     rows = []
     for directory in (RUNS / "explanation").iterdir():
-        if directory.name.startswith(("dev-", "heldout-")):
+        if rated_run(directory.name):
             rows.extend(read_rows(directory / "rows.jsonl"))
     return write_blind_sheet(rows, families, DOCS / "rating" / "blind_sheet.csv", RUNS / "blind_key.json", seed=23)
 
