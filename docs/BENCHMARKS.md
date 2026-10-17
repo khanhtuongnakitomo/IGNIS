@@ -1,6 +1,6 @@
 # Hosted model benchmarks for #23
 
-**Prompt v2 (2026-10-17):** live explanations now use the v2 prompt, which keeps identifiers out of prose. Its one dev run is in [Prompt v2 on dev](#prompt-v2-on-dev); every other result here is v1. The replay package is still v1, because the v2 demo draft failed validation. The [scenario technical review](benchmarks/scenarios/TECHNICAL_REVIEW.md) records schema and interpretation limits without changing the frozen labels or results.
+**Prompt evaluations (2026-10-17):** live explanations default to v2. See [Prompt v2 on dev](#prompt-v2-on-dev) and the separate [opt-in v3 evaluation](#guarded-v3-evaluation-opt-in); all original stage results remain v1. The replay package is still v1, because the v2 demo draft failed validation. The [scenario technical review](benchmarks/scenarios/TECHNICAL_REVIEW.md) records schema and interpretation limits without changing the frozen labels or results.
 
 Measured on 2026-10-16 with the event's AMD API and its one shared key (20 requests per minute, $1 per day). Each run happened once, on small sets, so treat every number as preliminary. The explanation scenarios are synthetic: Yoshio drafted them, and they are pending Tuong's review. Every number below is in [results.json](benchmarks/results.json). The inputs and settings are frozen in [manifest.json](benchmarks/manifest.json).
 
@@ -100,8 +100,30 @@ Run on 2026-10-17 with DeepSeek-V4-Flash on the same 12 dev packs and settings a
   - It abstained where support was expected on S02 (alternatives) and S03 (negation).
   - It did not abstain on S05, S06 (wrong-model manual, where the pack was empty) or S12. v1 missed only S05 and S12.
 - **Identifiers still appear.** 3 of the 4 invalid drafts failed only on identifier digits, such as the asset model PX-300.
-- **Number words count as numbers.** The validator also rejects words such as "one" and "first" in prose (`NUMBER_WORDS` in `workflow/context.py`), and the v2 prompt does not mention them.
+- **Number words count as numbers.** The validator rejects words such as "one" and "first" in prose (`NUMBER_WORDS` in `workflow/context.py`). The shared v1/v2 rules already explicitly prohibit these words; the failure is instruction compliance, not a missing rule.
 - **One run only.** v1's DeepSeek decision was the same in all 15 repeat runs, but v2 has no repeat yet, so part of the drop may be run-to-run variation. This is evidence for the #17 prompt decision; it does not change the model selection.
+
+## Guarded v3 evaluation (opt-in)
+
+V3 adds explicit examples, targeted repair instructions and evidence/abstention guidance. It also abstains in code when no applicable passages exist, while leaving computed facts available. Numerical validation is unchanged. V1/v2 prompt identities and the working v1 demo recordings are preserved. Live defaults remain v2: use `EXPLANATION_PROMPT_VERSION=v3` only to opt in, or `--prompt-version v3` with the benchmark and demo recorder.
+
+One capped DeepSeek-V4-Flash run on the same 12 synthetic dev scenarios produced the following preliminary results. The [summary](benchmarks/v3-dev/summary.json), [per-scenario rows](benchmarks/v3-dev/rows.jsonl) and [sanitized response recordings](benchmarks/v3-dev/explanation-replay.jsonl) are committed so the metrics can be reproduced offline by the benchmark-protocol tests. These are synthetic expected labels pending human review, not semantic-support ratings or an untouched held-out evaluation.
+
+| Measure | v2 | v3 |
+| --- | --- | --- |
+| First model response valid | 3/12 | 6/10 |
+| Final valid output, including deterministic abstentions | 8/12 | 10/12 |
+| Support/abstention decision matches expected label, including invalid drafts | 7/12 | 8/12 |
+| Cites an expected passage in support cases | 6/8 | 4/8 |
+| Deterministic no-inference abstentions | 0 | 2 |
+| Model time p50 / p95, including repairs | 20.187 / 60.328 s (n=12) | 10.030 / 19.828 s (n=10) |
+| HTTP attempts | 21 | 14 |
+
+S06 and S09 had no applicable passages and were handled without model calls. They are excluded from the first-model-response and model-latency denominators. Final validity includes them; a valid abstention is not a repaired model response. The outcome score includes structurally invalid answers and must not be read as an accepted-output success rate. V3 abstained in all required abstention cases, but also abstained on S03, S04, S07 and S11 where the frozen labels expected support. S05 and S11 remained invalid under the unchanged number rule.
+
+**Decision:** keep v3 opt-in. Increased structural validity and conservative abstention do not outweigh the drop in expected-passage support sufficiently to promote it on a single dev run. No demo re-recording or held-out run was made. The original v1/v2 published results and rating sheet remain unchanged. The new reporting logic separates deterministic abstentions and labels latency sample counts correctly.
+
+The job used 14 of its 24 allowed attempts in 109.8 seconds (600-second cap, 25% allowance reserve). Successful-response allowance headers changed from $0.99721570 to $0.99630134 remaining; shared-key headers can include other callers. This is not an end-to-end browser latency measurement.
 
 ## Stage 3: runtime on the shared key
 

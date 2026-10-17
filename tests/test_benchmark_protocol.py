@@ -213,6 +213,15 @@ class CommandGuardTests(unittest.TestCase):
 
 
 class PromptVersionTests(unittest.TestCase):
+    def test_published_v3_dev_metrics_reproduce_from_recordings_without_a_key(self):
+        directory = ROOT / "docs" / "benchmarks" / "v3-dev"
+        summary = json.loads((directory / "summary.json").read_text(encoding="utf-8"))
+        provider = HostedExplanationProvider(None, "DeepSeek-V4-Flash", replay_path=directory / "explanation-replay.jsonl",
+                                             budget_fallback=True, prompt_version="v3")
+        rows = [run_family(family, provider) for family in load_scenarios("dev")]
+        self.assertEqual(summarize_model(rows), summary["models"]["DeepSeek-V4-Flash"])
+        self.assertEqual(provider.client, None)
+
     def test_guarded_abstentions_are_not_failed_model_responses_or_model_latencies(self):
         family = next(family for family in load_scenarios("dev") if family["family_id"] == "S06")
         provider = HostedExplanationProvider(ScriptedClient(), "m", prompt_version="v3")
@@ -259,7 +268,7 @@ class DemoRecordingTests(unittest.TestCase):
         recorder = load_script("record_demo_replay.py")
         client = OutageClient()
         with tempfile.TemporaryDirectory() as directory:
-            arguments = Namespace(out=Path(directory), explanation_model="m",
+            arguments = Namespace(out=Path(directory), explanation_model="m", prompt_version="v3",
                                   extraction_replay=ROOT / "docs" / "benchmarks" / "replay" / "extraction-replay.jsonl")
             with self.assertRaisesRegex(SystemExit, "not pending_expert_review"):
                 recorder.record(arguments, client)

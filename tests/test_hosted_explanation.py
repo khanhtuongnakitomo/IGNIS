@@ -190,6 +190,13 @@ class WorkflowIntegrationTests(unittest.TestCase):
 
 
 class EnvironmentTests(unittest.TestCase):
+    def test_v3_is_opt_in_and_the_existing_live_default_stays_v2(self):
+        environment = {"MODEL_API_KEY": "test-key", "EXPLANATION_MODEL_NAME": "m"}
+        _, default = providers_from_environment(environment)
+        self.assertEqual(default.prompt.version, "v2")
+        _, candidate = providers_from_environment({**environment, "EXPLANATION_PROMPT_VERSION": "v3"})
+        self.assertEqual(candidate.prompt.version, "v3")
+
     def test_no_model_names_means_no_providers(self):
         self.assertEqual(providers_from_environment({}), (None, None))
 
