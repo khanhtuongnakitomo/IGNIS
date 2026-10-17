@@ -1,6 +1,14 @@
 # Local workflow API
 
-The service is a local, single-operator demonstration backend. It binds only to `127.0.0.1`; this does not provide production authentication or multi-user controls. SQLite stores run state and history. Source uploads accept CSV, TSV, JSON, JSONL, and XLSX (`content_base64` for binary XLSX). The default extraction and explanation providers are unavailable. Fixture extraction and manually supplied cited drafts are explicit alternatives; hosted inference is not configured.
+The service is a local, single-operator demonstration backend. It binds only to `127.0.0.1`; this does not provide production authentication or multi-user controls. SQLite stores run state and history. Source uploads accept CSV, TSV, JSON, JSONL, and XLSX (`content_base64` for binary XLSX). Providers are unavailable in the default bare host; `scripts/serve_hosted.py` injects explicit live or recorded providers. See the [connected local workspace guide](LOCAL_RUN.md) for replay startup without a key.
+
+## Browser state contract
+
+The frontend sends the latest returned `revision` as `expected_revision` for every mutation, preserves a returned failed-stage run, and refreshes after 409 without automatically repeating the mutation. No automatic POST retries are made. `GET /health` reports extraction/explanation mode, model, explanation prompt identity, corpus mode and whether the explicit recorded sample is available; it returns no credentials. `GET /demo-input` exists only when the hosted replay launcher supplies a sample and returns its synthetic flag, name, operator, filename and CSV text.
+
+UI stages map to backend fields: Source = upload; Mapping = mapping; Review = extraction plus review; Facts = facts plus alerts; Evidence = context including expert decisions; Report = report. `review` becomes `succeeded` only when every canonical record has a decision; analysis may still use a reviewed subset while review remains pending. Expert review changes context status to `accepted`, `corrected`, `rejected`, `inconclusive` or `facts_only_approved`. A new expert decision clears the current report pointer while immutable historical reports remain downloadable. Rejected/inconclusive decisions cannot issue a report.
+
+Live explanation defaults to prompt v2, which avoids identifiers in prose and retains strict typed numeric bindings. V3 is opt-in with `EXPLANATION_PROMPT_VERSION=v3`; it adds repair examples and abstains without inference when the pack has no applicable passages. Existing recordings replay with their original v1/v2/v3 identity, never relabelled as another version. The [dev comparison](BENCHMARKS.md#guarded-v3-evaluation-opt-in) explains why v3 is not promoted. See also the [scenario technical review](benchmarks/scenarios/TECHNICAL_REVIEW.md).
 
 ## Start and seed (Windows PowerShell, repository root)
 
@@ -17,7 +25,18 @@ Every mutation requires `expected_revision` from the latest run response. A succ
 
 ## Provider adapter interfaces
 
-Adapters are injected by the local Python host when constructing `Workflow`; no HTTP route accepts arbitrary provider code or credentials. `extraction_provider(records: list[CanonicalRecord]) -> list[ExtractionSuggestion]` receives canonical source rows and must return typed extraction suggestions. `explanation_provider(pack: dict) -> dict` receives the immutable evidence pack and returns the typed cited-draft contract described below. Explanation adapters may expose string attributes `model_id`, `prompt_id`, and `explanation_mode`; these are persisted as provenance. Extraction metadata remains separate from explanation metadata. Adapter exceptions are recorded at their stage, and no hosted inference is configured in this delivery.
+Adapters are injected by the local Python host when constructing `Workflow`; no HTTP route accepts arbitrary provider code or credentials. `extraction_provider(records: list[CanonicalRecord]) -> list[ExtractionSuggestion]` receives canonical source rows and must return typed extraction suggestions. `explanation_provider(pack: dict) -> dict` receives the immutable evidence pack and returns the typed cited-draft contract described below. Explanation adapters may expose string attributes `model_id`, `prompt_id`, and `explanation_mode`; these are persisted as provenance. Extraction metadata remains separate from explanation metadata. Adapter exceptions are recorded at their stage. `scripts/serve_hosted.py` injects hosted AMD providers: extraction uses the frozen configuration in `ignis_wo/hosted/extraction_config.json` (its few-shot examples need `scripts/fetch_maintie.py`), and explanation retries once without `max_tokens` when a model rejects the 4096-token budget. Both roles share one request pacer per process.
+
+## Reviewed document corpus
+
+`Workflow(..., corpus_sources=(corpus, graph))` retrieves from a reviewed corpus snapshot. Without it, retrieval uses the synthetic fixture corpus, and `context.corpus_mode` reports `synthetic_fixture` or `reviewed_snapshot`. Eligibility is still filtered in code by reviewed status, asset model and component before the top three passages are ranked. Steps:
+
+1. Read a document into unreviewed chunks: `python scripts/ingest_document.py manual.pdf --document-id MAN-1 --revision 1 --reader native`. Use `--reader mineru` for scans or images, which needs `DOCUMENT_OCR_MODEL`.
+2. Approve the chunks for one asset model and component: `python scripts/review_document.py approve <artifact dir> --reviewer ... --reason ... --asset-model PX-100 --component seal`. Corrections are stored beside the raw text, which is never rewritten. Partial artifacts are refused.
+3. Publish an immutable snapshot: `python scripts/review_document.py publish <artifact dirs> --asset PUMP-SYN-01=PX-100 --out outputs/corpus/pump-v1.json`.
+4. Serve it: `python scripts/serve_hosted.py --corpus outputs/corpus/pump-v1.json`.
+
+Reports record the extraction model that produced the suggestions (`extraction_identity`: model id, version and whether it is the scored configuration). Under context review they also list each evidence passage with its document version, page and chunk, source file hash and reader. Rebuilding context gives a new evidence pack and clears the draft and signoff. Issued PDFs stay in history.
 
 ## Routes
 

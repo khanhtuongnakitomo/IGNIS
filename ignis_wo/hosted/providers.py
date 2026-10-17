@@ -4,17 +4,24 @@ MODEL_API_KEY           shared event key (secret, never logged)
 MODEL_BASE_URL          defaults to the AMD Token Factory URL
 MODEL_NAME              extraction model; extraction stays unavailable when unset
 EXPLANATION_MODEL_NAME  explanation model; explanation stays unavailable when unset
+EXPLANATION_PROMPT_VERSION  v2 by default; v3 is an opt-in evaluation candidate
+DOCUMENT_OCR_MODEL      document reader for scripts/ingest_document.py --reader mineru (e.g. MinerU2.5-Pro)
 
 Load them with `uv run --env-file .env ...`.
+Extraction uses the frozen configuration in extraction_config.json, so it needs the MaintIE train
+split from scripts/fetch_maintie.py. Explanation sends max_tokens=4096 and, when a model rejects that
+budget, retries once without it; both roles share one pacer per process.
 """
 
+import json
 import os
 from pathlib import Path
 
-from ignis_wo.extraction.adapters import LiveAdapter
+from ignis_wo.extraction.adapters import LiveAdapter, ReplayAdapter
 from ignis_wo.extraction.suggest import suggest_all
 from ignis_wo.hosted.explanation import HostedExplanationProvider
-from ignis_wo.hosted.pacing import RequestPacer
+from ignis_wo.hosted.frozen import frozen_extraction_adapter, load_train_items
+from ignis_wo.hosted.pacing import RequestPacer, shared_pacer
 from ignis_wo.hosted.transport import DEFAULT_BASE_URL, ChatClient
 
 
@@ -24,7 +31,7 @@ def client_from_environment(environment=None, pacer: RequestPacer | None = None)
     if not api_key:
         raise ValueError("MODEL_API_KEY is not set; add it to .env and run with `uv run --env-file .env`")
     base_url = environment.get("MODEL_BASE_URL") or DEFAULT_BASE_URL
-    return ChatClient(base_url, api_key, pacer=pacer or RequestPacer())
+    return ChatClient(base_url, api_key, pacer=pacer or shared_pacer())
 
 
 def extraction_provider_for(adapter: LiveAdapter, max_records: int):
@@ -34,12 +41,16 @@ def extraction_provider_for(adapter: LiveAdapter, max_records: int):
         return suggest_all(records, adapter)
 
     extraction_provider.model_id = adapter.model_id
+    extraction_provider.extraction_mode = "hosted_replay" if isinstance(adapter, ReplayAdapter) else "hosted_live"
     extraction_provider.model_version = adapter.model_version
+    extraction_provider.scored_configuration = getattr(adapter, "scored_configuration", None)
     return extraction_provider
 
 
-def providers_from_environment(environment=None, record_directory: Path | None = None, max_records: int = 25):
-    """Returns (extraction_provider, explanation_provider); each is None when its model is not configured."""
+def providers_from_environment(environment=None, record_directory: Path | None = None, max_records: int = 25,
+                               train_items: list[dict] | None = None, frozen_config: dict | None = None):
+    """Returns (extraction_provider, explanation_provider); each is None when its model is not configured.
+    MaintIE train items are loaded only when extraction is configured."""
     environment = os.environ if environment is None else environment
     extraction_model = environment.get("MODEL_NAME")
     explanation_model = environment.get("EXPLANATION_MODEL_NAME")
@@ -51,9 +62,37 @@ def providers_from_environment(environment=None, record_directory: Path | None =
     extraction_provider = explanation_provider = None
     if extraction_model:
         record_path = record_directory / "extraction-replay.jsonl" if record_directory else None
-        adapter = LiveAdapter(client, extraction_model, record_path=record_path)
+        items = train_items if train_items is not None else load_train_items()
+        adapter = frozen_extraction_adapter(client, extraction_model, items, record_path, frozen_config)
         extraction_provider = extraction_provider_for(adapter, max_records)
     if explanation_model:
         record_path = record_directory / "explanation-replay.jsonl" if record_directory else None
-        explanation_provider = HostedExplanationProvider(client, explanation_model, record_path=record_path)
+        explanation_provider = HostedExplanationProvider(client, explanation_model, record_path=record_path,
+                                                         budget_fallback=True,
+                                                         prompt_version=environment.get("EXPLANATION_PROMPT_VERSION") or "v2")
+    return extraction_provider, explanation_provider
+
+
+def first_row(path: Path) -> dict:
+    with path.open(encoding="utf-8") as file:
+        return json.loads(file.readline())
+
+
+def replay_providers(directory: Path, max_records: int = 25):
+    """Providers that only serve recordings from `directory`; a missing recording fails, nothing goes live."""
+    extraction_path = directory / "extraction-replay.jsonl"
+    explanation_path = directory / "explanation-replay.jsonl"
+    if not extraction_path.exists() and not explanation_path.exists():
+        raise ValueError(f"{directory} has no extraction-replay.jsonl or explanation-replay.jsonl")
+    extraction_provider = explanation_provider = None
+    if extraction_path.exists():
+        row = first_row(extraction_path)
+        adapter = ReplayAdapter(extraction_path, row["model_id"], row["model_version"])
+        adapter.scored_configuration = row.get("scored_configuration")
+        extraction_provider = extraction_provider_for(adapter, max_records)
+    if explanation_path.exists():
+        row = first_row(explanation_path)
+        explanation_provider = HostedExplanationProvider(
+            None, row["model_id"], row["output_mode"], row.get("reasoning_effort"), row.get("max_tokens"),
+            replay_path=explanation_path, budget_fallback=row.get("budget_fallback", False))
     return extraction_provider, explanation_provider

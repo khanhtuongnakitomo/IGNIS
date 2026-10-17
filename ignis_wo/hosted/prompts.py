@@ -1,5 +1,5 @@
 """Versioned prompts. Each prompt_id ends with a hash of its rendered template and examples,
-so a changed prompt can never reuse responses recorded for an older one."""
+including the example answers, so a changed prompt can never reuse responses recorded for an older one."""
 
 import json
 
@@ -115,9 +115,16 @@ class ExtractionPrompt:
         entity_list = "\n".join(sorted(entity_labels()))
         relation_list = "\n".join(sorted(relation_labels()))
         self.system = f"{EXTRACTION_RULES}\n\nEntity labels:\n{entity_list}\n\nRelation labels:\n{relation_list}"
+        name = "extraction-fewshot-v2" if self.examples else "extraction-instruction-v2"
+        example_tokens = [item["tokens"] for item in self.examples]
+        example_answers = [gold_to_token_form(item) for item in self.examples]
+        self.prompt_id = f"{name}-{content_hash([self.system, example_tokens, example_answers])[:8]}"
+
+    def legacy_prompt_id(self) -> str:
+        """The v1 identity, which hashed only the example text. Used only to link to runs scored under v1."""
         name = "extraction-fewshot-v1" if self.examples else "extraction-instruction-v1"
         example_texts = [" ".join(item["tokens"]) for item in self.examples]
-        self.prompt_id = f"{name}-{content_hash([self.system, example_texts])[:8]}"
+        return f"{name}-{content_hash([self.system, example_texts])[:8]}"
 
     def messages(self, text_norm: str) -> list[dict]:
         messages = [{"role": "system", "content": self.system}]
@@ -136,17 +143,47 @@ def pack_for_prompt(pack: dict) -> dict:
 
 
 class ExplanationPrompt:
-    def __init__(self):
+    def __init__(self, version="v2"):
+        if version not in {"v1", "v2", "v3"}:
+            raise ValueError("unknown explanation prompt version")
+        self.version = version
         self.system = EXPLANATION_RULES
-        self.prompt_id = f"explanation-draft-v1-{content_hash(self.system)[:8]}"
+        if version in {"v2", "v3"}:
+            self.system += (
+                "\nIdentifier rule: do not copy asset IDs, model names, document IDs or fact IDs into prose. "
+                "For example, write 'the pump' or 'the applicable manual', never 'PX-100'. "
+                "Keep exact identifiers only in citations and fact_ids. This applies to uncertainty as well as claims."
+            )
+        if version == "v3":
+            self.system += (
+                "\nEvidence decision before drafting: identify what the applicable passages actually support. "
+                "A cautious observation or competing explanations can be supported without establishing causation. "
+                "Keep alternatives when passages describe different possibilities, and respect explicit negations. "
+                "Lexical overlap, a generic heading, an asset name or a computed priority alone is not explanatory support. "
+                "If passages are absent, unrelated, or only say the cause was not investigated, abstain from an explanation; "
+                "you may describe a directly supported observation but never invent its cause. "
+                "When abstaining, leave hypotheses and alternatives empty, set inspection to null, and explain the evidence gap."
+                "\nProse examples: invalid 'at least one failed-state record'; valid 'Failed-state observations are recorded.' "
+                "Invalid 'the first cause' or 'the PX-100 pump'; valid 'a possible explanation' or 'the pump'. "
+                "Never replace a digit with a number word. Put the supporting fact identifier in fact_ids instead of "
+                "expressing any count, ranking, measurement or score in text. This also applies to uncertainty and inspection."
+            )
+        self.prompt_id = f"explanation-draft-{version}-{content_hash(self.system)[:8]}"
 
     def messages(self, pack: dict) -> list[dict]:
         evidence = json.dumps(pack_for_prompt(pack), sort_keys=True)
         return [{"role": "system", "content": self.system}, {"role": "user", "content": f"Evidence pack:\n{evidence}"}]
 
-    @staticmethod
-    def repair_messages(previous: dict, errors: list[str]) -> list[dict]:
+    def repair_messages(self, previous: dict, errors: list[str]) -> list[dict]:
         problems = "\n".join(f"- {error}" for error in errors)
         request = (f"The draft was rejected:\n{problems}\nReturn a corrected JSON object that follows every rule. "
                    'Every claim, including inspection, must be an object {"text", "citations", "fact_ids"}.')
+        if self.version == "v3":
+            request += (
+                " Recheck support and abstention against the original pack; validation is not proof of support. "
+                "Remove every digit and number word from ALL prose, including uncertainty. "
+                "For example replace 'at least one failed-state record' with 'Failed-state observations are recorded.' "
+                "Do not retain an implied count: use fact_ids for quantities. Keep identifiers only in citations/fact_ids. "
+                "If evidence does not support an explanation, abstain with empty hypotheses/alternatives and null inspection."
+            )
         return [{"role": "assistant", "content": json.dumps(previous)}, {"role": "user", "content": request}]
