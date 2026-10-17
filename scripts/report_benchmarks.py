@@ -9,6 +9,7 @@ Jobs named with a prompt suffix (e.g. -v2) are charted as their own series and k
 import argparse
 import datetime
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -106,7 +107,7 @@ def charts(results: dict) -> dict[str, str]:
                                                          critical, "%", 100, note="2 pages per family; synthetic pages")}
     dev = {name: run for name, run in results["explanation"].items() if run["stage"] == "dev"}
     if dev:
-        metrics = [("first_pass_valid", "First-pass valid"), ("valid_after_repair", "Valid after repair"),
+        metrics = [("first_pass_valid", "First model response valid"), ("valid_after_repair", "Final valid"),
                    ("outcome_correct", "Support/abstain right"), ("support_hit", "Cites expected passage")]
         series = {}
         for name, run in dev.items():
@@ -114,12 +115,12 @@ def charts(results: dict) -> dict[str, str]:
                 series[series_label(name, model)] = [percent(summary[key]) for key, _ in metrics]
         output["explanation-dev-quality.svg"] = grouped_bars(
             "Explanation on 12 dev scenarios (synthetic, drafted by Yoshio)", [label for _, label in metrics], series,
-            "%", 100, note="n = 12 each; Qwen's 2 timeouts are absent from the last two bars; validity counts the no-digits rule")
-        latency = {series_label(name, model): [summary["model_seconds_p50"], summary["model_seconds_p95"]]
+            "%", 100, note="Synthetic dev; first-pass excludes no-call abstentions; final validity includes them; failed decisions may have no score")
+        latency = {f"{series_label(name, model)} (n={summary['latency_n']})": [summary["model_seconds_p50"], summary["model_seconds_p95"]]
                    for name, run in dev.items() for model, summary in run["models"].items()}
         output["explanation-dev-latency.svg"] = grouped_bars("Explanation model time per scenario, dev (seconds)",
                                                              ["p50", "p95"], latency, " s",
-                                                             note="Includes repair calls; n = 12 per model; preliminary tails")
+                                                             note="Includes repair calls; n counts scenarios with model calls; preliminary tails")
     extraction = sorted(results["extraction"].values(), key=lambda run: run["configuration"]["concurrency"])
     explanation = results["explanation"]
     explanation_rates = [explanation.get("dev-DeepSeek-V4-Flash", {}).get("runtime", {}).get("valid_per_minute"),
@@ -134,12 +135,13 @@ def charts(results: dict) -> dict[str, str]:
 
 
 def series_label(run_name: str, model: str) -> str:
-    return f"{model} (v2)" if run_name.endswith("-v2") else model
+    version = re.search(r"-(v[2-9]\d*)$", run_name)
+    return f"{model} ({version.group(1)})" if version else model
 
 
 def rated_run(run_name: str) -> bool:
     """The blind sheet holds the v1 dev and held-out drafts; later prompt versions are rated separately."""
-    return run_name.startswith(("dev-", "heldout-")) and not run_name.endswith("-v2")
+    return run_name.startswith(("dev-", "heldout-")) and not re.search(r"-v[2-9]\d*$", run_name)
 
 
 def manifest(results: dict) -> dict:

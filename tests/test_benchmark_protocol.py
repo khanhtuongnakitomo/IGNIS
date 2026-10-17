@@ -213,20 +213,35 @@ class CommandGuardTests(unittest.TestCase):
 
 
 class PromptVersionTests(unittest.TestCase):
+    def test_guarded_abstentions_are_not_failed_model_responses_or_model_latencies(self):
+        family = next(family for family in load_scenarios("dev") if family["family_id"] == "S06")
+        provider = HostedExplanationProvider(ScriptedClient(), "m", prompt_version="v3")
+        row = run_family(family, provider)
+        self.assertTrue(row["valid"])
+        self.assertTrue(row["outcome_correct"])
+        self.assertTrue(row["deterministic_abstention"])
+        summary = summarize_model([row])
+        self.assertEqual(summary["first_pass_valid"], {"true": 0, "n": 0})
+        self.assertEqual(summary["deterministic_abstentions"], 1)
+        self.assertEqual(summary["latency_n"], 0)
+
     def test_v2_jobs_get_their_own_names_and_v1_names_are_unchanged(self):
         job_name = load_script("benchmark_explanations.py").job_name
         arguments = {"stage": "dev", "models": ["m"], "concurrency": 1}
         self.assertEqual(job_name(Namespace(**arguments, prompt_version="v1")), "dev-m")
         self.assertEqual(job_name(Namespace(**arguments, prompt_version="v2")), "dev-m-v2")
+        self.assertEqual(job_name(Namespace(**arguments, prompt_version="v3")), "dev-m-v3")
         self.assertEqual(job_name(Namespace(**{**arguments, "stage": "runtime", "concurrency": 2}, prompt_version="v2")),
                          "runtime-m-c2-v2")
 
     def test_v2_runs_are_charted_apart_and_kept_out_of_the_v1_blind_sheet(self):
         report = load_script("report_benchmarks.py")
         self.assertEqual(report.series_label("dev-m-v2", "m"), "m (v2)")
+        self.assertEqual(report.series_label("dev-m-v3", "m"), "m (v3)")
         self.assertEqual(report.series_label("dev-m", "m"), "m")
         self.assertTrue(report.rated_run("heldout-m"))
         self.assertFalse(report.rated_run("dev-m-v2"))
+        self.assertFalse(report.rated_run("dev-m-v3"))
         self.assertFalse(report.rated_run("repeat-m"))
 
 

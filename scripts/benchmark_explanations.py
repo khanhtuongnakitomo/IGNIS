@@ -199,7 +199,7 @@ def parse_arguments():
     parser.add_argument("--max-attempts", type=int, default=40)
     parser.add_argument("--max-seconds", type=float, default=1800)
     parser.add_argument("--allowance-reserve", type=float, default=0.25)
-    parser.add_argument("--prompt-version", choices=["v1", "v2"], default="v2")
+    parser.add_argument("--prompt-version", choices=["v1", "v2", "v3"], default="v2")
     parser.add_argument("--rescore", action="store_true", help="re-score a finished job from its recordings, no calls")
     return parser.parse_args()
 
