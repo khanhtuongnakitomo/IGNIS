@@ -16,7 +16,7 @@ async function current(page: Page): Promise<Run> {
   return response.json();
 }
 async function analyzed(page: Page) {
-  await page.goto("/#/app");
+  await page.goto("/#/app/manual");
   await page.getByRole("button", { name: "Load recorded demo input", exact: true }).click();
   await expect(page.getByRole("button", { name: "Confirm mapping", exact: true })).toBeVisible();
   await saved(page, page.getByRole("button", { name: "Confirm mapping", exact: true }));
@@ -122,8 +122,38 @@ test("@mock-boundary 429 and timeout keep saved facts readable without retry sto
   await expect(page.getByRole("button", { name: run.facts[0].fact_id, exact: true })).toBeVisible();
 });
 
-test("@mock-boundary stale revision refreshes state and does not repeat the mutation", async ({ page }) => {
+test("@replay guided demo run plays to signoff, honours the expert decision and resumes after reload", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
   await page.goto("/#/app");
+  await page.getByRole("button", { name: "Start demo run", exact: true }).click();
+  await page.getByRole("button", { name: "Playback speed 1×", exact: true }).click();
+  const signoff = page.getByRole("button", { name: /^Sign off:/ });
+  await expect(signoff).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("radio", { name: /^Reject finding/ }).check();
+  await signoff.click();
+  await expect(page.getByText("Report blocked", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Download PDF", exact: true })).toHaveCount(0);
+  await page.getByRole("radio", { name: /^Correct finding/ }).check();
+  await signoff.click();
+  const download = page.getByRole("link", { name: "Download PDF", exact: true });
+  await expect(download).toBeVisible({ timeout: 30_000 });
+  const id = await page.evaluate(() => localStorage.getItem("ignis-demo-run"));
+  const run: Run = await (await page.request.get(`/api/runs/${id}`)).json();
+  expect(run.snapshot?.entries).toHaveLength(5);
+  expect(run.draft_result?.explanation_mode).toBe("hosted_replay");
+  expect(run.expert_reviews.map(review => review.decision)).toEqual(["rejected", "corrected"]);
+  expect(run.latest_report?.expert_review.decision).toBe("corrected");
+  const pdf = await page.request.get(`/api/runs/${run.run_id}/report/${run.latest_report!.report_id}`);
+  expect((await pdf.body()).subarray(0, 4).toString()).toBe("%PDF");
+  await page.reload();
+  await expect(download).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start demo run", exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("@mock-boundary stale revision refreshes state and does not repeat the mutation", async ({ page }) => {
+  await page.goto("/#/app/manual");
   await page.getByRole("button", { name: "Load recorded demo input", exact: true }).click();
   await expect(page.getByRole("button", { name: "Confirm mapping", exact: true })).toBeVisible();
   let calls = 0;
