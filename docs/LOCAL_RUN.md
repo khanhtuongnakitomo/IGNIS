@@ -19,7 +19,7 @@ The default is **recorded replay**, using the committed six-record synthetic inp
 
 ## Guided demo run
 
-`#/app` plays the recorded scenario through the same workflow API with no file or typed input. Values bound to the replay (operator, mapping, record decisions and reviewer, criticality, evidence query) are shown as pinned fields. The run stops at expert signoff, where accept, correct, reject and inconclusive have their real backend effects; accepted or corrected findings then issue the PDF. Signoffs stay labelled simulated. It only starts against a server whose extraction and explanation are both in replay mode.
+`#/app` runs the recorded scenario through the same workflow API with no file upload. **Continuous** mode plays every stage on its own; **Manual** mode presents each stage's form for you to fill and submit, accepting any run name or record reason but only the recorded value for replay-bound fields (with a **Fill recorded values** shortcut). You can switch modes mid-run. Values bound to the replay (operator, mapping, record decisions and reviewer, criticality, evidence query) are shown as pinned fields. The run stops at expert signoff, where accept, correct, reject and inconclusive have their real backend effects; accepted or corrected findings then issue the PDF. Signoffs stay labelled simulated. It only starts against a server whose extraction and explanation are both in replay mode.
 
 ## Your first manual run
 

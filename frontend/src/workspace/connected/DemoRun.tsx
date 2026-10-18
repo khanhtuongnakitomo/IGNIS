@@ -95,6 +95,61 @@ function typedFor(step: StepId, run: Run | null, input: DemoInput | null): strin
   return [];
 }
 
+type Mode = "continuous" | "manual";
+const MODE_KEY = "ignis-demo-mode";
+const ACTION: Partial<Record<StepId, string>> = {
+  create: "Open run", upload: "Upload recorded export", mapping: "Confirm mapping", extract: "Start extraction", review: "Save record decision",
+  analyze: "Analyze approved records", context: "Retrieve evidence", generate: "Generate explanation", issue: "Issue approved PDF",
+};
+/** `free` fields accept any text; the others must equal the recorded value for the replay to match. */
+type ManualField = { key: string; label: string; expected: string; free?: boolean; options?: { value: string; label: string }[]; wide?: boolean };
+function manualFields(step: StepId, run: Run | null, input: DemoInput | null): ManualField[] {
+  if (step === "create") return input ? [{ key: "name", label: "Run name", expected: input.name, free: true }, { key: "operator", label: "Operator", expected: input.operator }] : [];
+  if (step === "mapping") {
+    const options = ["", ...(run?.columns || [])].map(column => ({ value: column, label: column || "Not mapped" }));
+    return [...Object.entries(run?.proposal?.mapping || {}).map(([field, column]) => ({ key: `map:${field}`, label: field, expected: column || "", options })),
+      { key: "reason", label: "Confirmation reason", expected: SCENARIO.mappingReason, wide: true }];
+  }
+  if (step === "review" && run) {
+    const record = pendingRecord(run);
+    if (!record) return [];
+    const status = recordStatus(run, record.record_id);
+    return [{ key: "status", label: "Record decision", expected: status, options: [{ value: "", label: "Choose a decision" }, { value: "accepted", label: "Accept proposal" }, { value: "rejected", label: "Reject record" }] },
+      { key: "reason", label: "Record decision reason", expected: recordReason(status), free: true, wide: true }];
+  }
+  if (step === "analyze") return [{ key: "component", label: "Critical component", expected: SCENARIO.criticality.component },
+    { key: "value", label: "Criticality multiplier", expected: String(SCENARIO.criticality.value) }, { key: "reason", label: "Criticality reason", expected: SCENARIO.criticality.reason }];
+  if (step === "context") return [{ key: "asset", label: "Evidence asset", expected: run ? assetOf(run) : "" },
+    { key: "component", label: "Evidence component", expected: SCENARIO.component }, { key: "query", label: "Evidence query", expected: SCENARIO.query, wide: true }];
+  return [];
+}
+const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+function ManualStep({ step, fields, busy, note, onSubmit }: { step: StepId; fields: ManualField[]; busy: boolean; note?: string; onSubmit: (values: Record<string, string>) => void }) {
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map(f => [f.key, f.key.startsWith("map:") ? f.expected : ""])));
+  const valid = (f: ManualField) => (f.free ? !!values[f.key]?.trim() : f.options ? values[f.key] === f.expected : sameText(values[f.key] || "", f.expected));
+  return <div className="space-y-3 rounded-lg border border-accent/40 bg-accent-soft p-3">
+    <p className="text-sm font-medium text-brand-text">Your turn: {LABEL[step].replace(/^Your turn: /, "")}</p>
+    {note && <Note>{note}</Note>}
+    {!!fields.length && <div className="grid gap-3 sm:grid-cols-2">{fields.map(f => {
+      const value = values[f.key] || "";
+      const set = (next: string) => setValues(previous => ({ ...previous, [f.key]: next }));
+      const wrong = !f.free && value !== "" && !valid(f);
+      const shown = f.options?.find(option => option.value === f.expected)?.label || f.expected;
+      return <div key={f.key} className={cx("min-w-0", f.wide && "sm:col-span-2")}>
+        <Field label={f.label}>{f.options
+          ? <select className={inputClass} value={value} onChange={event => set(event.target.value)}>{f.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+          : <input className={inputClass} value={value} placeholder={f.expected} onChange={event => set(event.target.value)} />}</Field>
+        {wrong && <p className="mt-1 text-xs text-warn">The recording was made with “{shown}”. Another value would miss the replay.</p>}
+      </div>;
+    })}</div>}
+    <div className="flex flex-wrap gap-2">
+      <Button primary disabled={busy || !fields.every(valid)} onClick={() => onSubmit(values)}>{ACTION[step]}</Button>
+      {!!fields.length && <Button disabled={busy} onClick={() => setValues(previous => ({ ...previous, ...Object.fromEntries(fields.map(f => [f.key, f.free && previous[f.key]?.trim() ? previous[f.key] : f.expected])) }))}>Fill recorded values</Button>}
+    </div>
+  </div>;
+}
+
 function useTyped(text: string, active: boolean, speed: number) {
   const reduce = useReducedMotion();
   const [count, setCount] = useState(active && !reduce ? 0 : text.length);
@@ -158,6 +213,7 @@ export function DemoRun() {
   const [demoId, setDemoId] = useState<string | null>(() => localStorage.getItem(DEMO_KEY));
   const [input, setInput] = useState<DemoInput | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [mode, setModeState] = useState<Mode>(() => (localStorage.getItem(MODE_KEY) === "manual" ? "manual" : "continuous"));
   const [speed, setSpeed] = useState(1);
   const [reference, setReference] = useState<string | null>(null);
   const run = w.run && w.run.run_id === demoId ? w.run : null;
@@ -184,11 +240,11 @@ export function DemoRun() {
     void w.perform("Restoring the demo run", async () => w.select(await request<Run>(`/runs/${demoId}`)));
   });
 
-  const act = (target: StepId) => {
+  const act = (target: StepId, values: Record<string, string> = {}) => {
     const current = w.run;
     switch (target) {
       case "create": return w.perform("Opening a demo run", async () => {
-        const created = await w.create({ name: input!.name, operator: input!.operator, synthetic: true, adapter_mode: "injected" });
+        const created = await w.create({ name: values.name?.trim() || input!.name, operator: input!.operator, synthetic: true, adapter_mode: "injected" });
         remember(created.run_id);
       });
       case "upload": return w.perform("Uploading the recorded export", async () => {
@@ -199,7 +255,7 @@ export function DemoRun() {
       case "review": {
         const record = pendingRecord(current!)!;
         const status = recordStatus(current!, record.record_id);
-        return w.mutate(`/records/${record.record_id}`, { status, reason: recordReason(status), reviewer: SCENARIO.recordReviewer }, `Saving the decision for row ${record.locator.row}`);
+        return w.mutate(`/records/${record.record_id}`, { status, reason: values.reason?.trim() || recordReason(status), reviewer: SCENARIO.recordReviewer }, `Saving the decision for row ${record.locator.row}`);
       }
       case "analyze": return w.mutate("/analyze", { criticalities: [SCENARIO.criticality] }, "Computing facts and alerts");
       case "context": return w.mutate("/context", { asset_id: assetOf(current!), component: SCENARIO.component, query: SCENARIO.query }, "Retrieving applicable evidence");
@@ -221,15 +277,26 @@ export function DemoRun() {
   }, [playing, canAct, step, run?.revision, delay]);
   useEffect(() => { if (w.error || blocked) setPlaying(false); }, [w.error, blocked]);
   const finished = step === "done";
+  const manual = mode === "manual";
   useEffect(() => {
-    if (!playing) return;
+    if (!playing && !manual) return;
     document.getElementById(`demo-stage-${stage}`)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-  }, [stage, finished, playing, reduce]);
+  }, [stage, finished, playing, manual, reduce]);
   useEffect(() => { setReference(null); }, [run?.run_id]);
 
-  const start = () => { remember(null); w.setError(""); setPlaying(true); };
+  const setMode = (next: Mode) => {
+    setModeState(next);
+    localStorage.setItem(MODE_KEY, next);
+    w.setError("");
+    setPlaying(next === "continuous" && !!run && automatic);
+  };
+  const start = (next: Mode = mode) => { remember(null); setModeState(next); localStorage.setItem(MODE_KEY, next); w.setError(""); setPlaying(next === "continuous"); };
   const typingNow = (target: StepId) => playing && step === target && canAct;
-  const status = w.busy ? `${w.busy}…` : blocked ? "Stopped: the run left the recorded scenario." : w.error ? "Stopped on an error." : !run && !playing ? "Ready when you are." : playing && automatic ? `Next: ${LABEL[step]}` : LABEL[step];
+  const status = w.busy ? `${w.busy}…` : blocked ? "Stopped: the run left the recorded scenario." : w.error ? "Stopped on an error." : !run && !playing && !manual ? "Ready when you are."
+    : manual ? (automatic ? `Your step: ${LABEL[step]}` : LABEL[step]) : playing && automatic ? `Next: ${LABEL[step]}` : LABEL[step];
+  const manualStep = (target: StepId, note?: string) => manual && step === target && ready && !blocked
+    ? <ManualStep key={`${target}:${run ? pendingRecord(run)?.record_id || "" : ""}`} step={target} fields={manualFields(target, run, input)} busy={!!w.busy} note={note} onSubmit={values => void act(target, values)} />
+    : null;
 
   return <div className="flex min-h-dvh flex-col bg-bg text-fg">
     <header className="sticky top-0 z-40 border-b border-line bg-elevated/95 backdrop-blur">
@@ -241,14 +308,20 @@ export function DemoRun() {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-2">
-        {!run && !playing
-          ? <Button primary disabled={!ready || !!w.busy} onClick={start}><Icon name="play" size={14} />Start demo run</Button>
+        <div role="group" aria-label="Demo mode" className="flex rounded-lg border border-line-strong p-0.5">
+          {(["continuous", "manual"] as const).map(value => <button key={value} type="button" aria-pressed={mode === value} disabled={!!w.busy} onClick={() => setMode(value)}
+            className={cx("rounded-md px-3 py-1.5 text-sm transition-colors", mode === value ? "bg-hover text-fg" : "text-fg-3 hover:text-fg")}>{value === "continuous" ? "Continuous" : "Manual"}</button>)}
+        </div>
+        {manual
+          ? run && <Button disabled={!!w.busy} onClick={() => start()}><Icon name="replay" size={14} />Start over</Button>
+          : !run && !playing
+          ? <Button primary disabled={!ready || !!w.busy} onClick={() => start()}><Icon name="play" size={14} />Start demo run</Button>
           : <>
             <Button primary={!playing && automatic} disabled={!automatic || !ready || !!blocked} onClick={() => { w.setError(""); setPlaying(value => !value); }} aria-pressed={playing}>
               <Icon name={playing ? "pause" : "play"} size={14} />{playing ? "Pause" : "Play"}</Button>
             <Button disabled={!canAct} onClick={() => void act(step)}><Icon name="step" size={14} />Step</Button>
             <Button onClick={() => setSpeed(value => (value === 1 ? 2 : 1))} aria-label={`Playback speed ${speed}×`}>{speed}×</Button>
-            <Button disabled={!!w.busy} onClick={start}><Icon name="replay" size={14} />Start over</Button>
+            <Button disabled={!!w.busy} onClick={() => start()}><Icon name="replay" size={14} />Start over</Button>
           </>}
         <p role="status" aria-live="polite" className="ml-1 flex min-w-0 items-center gap-2 text-sm text-fg-2">
           {(w.busy || (playing && canAct)) && <span aria-hidden className="size-2 shrink-0 animate-pulse rounded-full bg-accent" />}
@@ -279,13 +352,14 @@ export function DemoRun() {
         <div className="mx-auto max-w-4xl space-y-5">
           {w.error && step !== "expert" && <div role="alert" className="space-y-3 rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm text-danger">
             <p>{w.error}</p>{w.cooldown > 0 && <p>Retry available in {w.cooldown}s.</p>}
-            <div className="flex flex-wrap gap-2">{automatic && <Button disabled={w.cooldown > 0 || !!w.busy || !ready} onClick={() => { w.setError(""); setPlaying(true); }}>Retry step</Button>}<Button onClick={() => void w.refresh()}>Reconnect</Button></div>
+            <div className="flex flex-wrap gap-2">{automatic && !manual && <Button disabled={w.cooldown > 0 || !!w.busy || !ready} onClick={() => { w.setError(""); setPlaying(true); }}>Retry step</Button>}<Button onClick={() => void w.refresh()}>Reconnect</Button></div>
           </div>}
-          {blocked && <div role="alert" className="space-y-3 rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-warn"><p>{blocked}</p><Button onClick={start}>Start over</Button></div>}
+          {blocked && <div role="alert" className="space-y-3 rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-warn"><p>{blocked}</p><Button onClick={() => start()}>Start over</Button></div>}
 
-          {!run && <Intro w={w} replay={replay} ready={ready} />}
-          {run && <StageCards run={run} w={w} step={step} input={input} speed={speed} typingNow={typingNow} inspect={setReference}
-            onSigned={() => setPlaying(true)} />}
+          {!run && <Intro w={w} replay={replay} ready={ready} mode={mode} start={start} />}
+          {!run && manual && ready && <StageCard index={0} title="Source: open a run" state="current">{manualStep("create")}</StageCard>}
+          {run && <StageCards run={run} w={w} step={step} input={input} speed={speed} typingNow={typingNow} inspect={setReference} manualStep={manualStep}
+            onSigned={() => { if (!manual) setPlaying(true); }} />}
         </div>
       </main>
     </div>
@@ -293,7 +367,7 @@ export function DemoRun() {
   </div>;
 }
 
-function Intro({ w, replay, ready }: { w: Controller; replay: boolean; ready: boolean }) {
+function Intro({ w, replay, ready, mode, start }: { w: Controller; replay: boolean; ready: boolean; mode: Mode; start: (mode: Mode) => void }) {
   return <section className="rounded-xl border border-line bg-elevated p-6 sm:p-8">
     <p className="t-label">Guided demo</p>
     <h1 className="mt-3 text-3xl font-semibold">Watch one maintenance export become a signed, cited report</h1>
@@ -303,29 +377,41 @@ function Intro({ w, replay, ready }: { w: Controller; replay: boolean; ready: bo
       <li className="rounded-lg border border-line p-3"><span className="text-fg">Real backend.</span> Every stage is saved by the workflow API, and the PDF is rendered on the server.</li>
       <li className="rounded-lg border border-line p-3"><span className="text-fg">You stay in control.</span> Pause, step through or speed up, inspect any fact or source, and choose the expert outcome.</li>
     </ul>
+    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      {([["continuous", "Watch it run", "Continuous mode plays every stage like a video and stops only for your signoff."],
+        ["manual", "Fill it in yourself", "Manual mode hands you each form. Type the values or fill the recorded ones, then press each action."]] as const).map(([value, title, text]) =>
+        <button key={value} type="button" disabled={!ready || !!w.busy} onClick={() => start(value)}
+          className={cx("rounded-lg border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50", mode === value ? "border-accent bg-accent-soft" : "border-line-strong hover:bg-hover")}>
+          <span className="flex items-center gap-2 font-medium text-fg"><Icon name={value === "continuous" ? "play" : "review"} size={14} />{title}</span>
+          <span className="mt-1 block text-sm text-fg-3">{text}</span>
+        </button>)}
+    </div>
     <div className="mt-6 text-sm text-fg-3">
       {!w.health && !w.error && <p className="flex items-center gap-2"><span aria-hidden className="size-2 animate-pulse rounded-full bg-accent" />Connecting to the demo server. A sleeping free-tier server can take about a minute to wake.</p>}
       {w.health && !replay && <Note>This server is not in recorded-replay mode, so the guided demo is disabled to avoid live model calls. Use the manual workspace at #/app/manual instead.</Note>}
       {w.health && replay && !w.health.demo_input_available && <Note>This server has no recorded demo input configured.</Note>}
-      {ready && <p>Press <span className="text-fg">Start demo run</span> above. The run plays on its own until it needs your signoff.</p>}
+      {ready && mode === "manual" && <p>The first form is below. You can switch modes at any point; Continuous picks up from your current step.</p>}
     </div>
   </section>;
 }
 
-function StageCards({ run, w, step, input, speed, typingNow, inspect, onSigned }: {
-  run: Run; w: Controller; step: StepId; input: DemoInput | null; speed: number; typingNow: (step: StepId) => boolean; inspect: (id: string) => void; onSigned: () => void;
+function StageCards({ run, w, step, input, speed, typingNow, inspect, manualStep, onSigned }: {
+  run: Run; w: Controller; step: StepId; input: DemoInput | null; speed: number; typingNow: (step: StepId) => boolean; inspect: (id: string) => void;
+  manualStep: (step: StepId, note?: string) => ReactNode; onSigned: () => void;
 }) {
   const stage = STAGE_OF[step];
   const state = (index: number): CardState => (index < stage || step === "done" ? "done" : index > stage ? "upcoming" : step === "expert" ? "waiting" : "current");
   const pending = pendingRecord(run);
   const draft = run.draft_result?.draft;
+  const extractForm = manualStep("extract");
   return <>
     <StageCard key="source" index={0} title="Source: recorded maintenance export" state={state(0)}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <ConsoleField label="Run name" value={input?.name || run.name} typing={false} speed={speed} />
+        <ConsoleField label="Run name" value={run.name} typing={false} speed={speed} />
         <ConsoleField label="Operator" value={run.operator} typing={false} speed={speed} />
         <ConsoleField label="Source file" value={run.filename || input?.filename || ""} typing={typingNow("upload")} speed={speed} wide />
       </div>
+      {manualStep("upload", `${input?.filename || "The recorded export"} is attached for you; no file picker is needed.`)}
       {run.raw_rows?.length ? <>
         <div className="overflow-x-auto rounded-lg border border-line"><table className="w-full text-left text-xs">
           <thead className="bg-bg text-fg-3"><tr>{run.columns?.map(column => <th key={column} className="p-2 font-medium whitespace-nowrap">{column}</th>)}</tr></thead>
@@ -336,16 +422,17 @@ function StageCards({ run, w, step, input, speed, typingNow, inspect, onSigned }
     </StageCard>
 
     {stage >= 1 && <StageCard key="mapping" index={1} title="Mapping: confirm source columns" state={state(1)}>
-      <div className="grid gap-3 sm:grid-cols-2">
+      {manualStep("mapping", "IGNIS proposed these columns. Confirm them with the recorded reason.") || <div className="grid gap-3 sm:grid-cols-2">
         {Object.entries(run.mapping ? (run.mapping as { mapping: Record<string, string | null> }).mapping : run.proposal?.mapping || {}).map(([field, column]) =>
           <ConsoleField key={field} label={field} value={column || "Not mapped"} typing={typingNow("mapping")} speed={speed} />)}
         <ConsoleField label="Confirmation reason" value={SCENARIO.mappingReason} typing={typingNow("mapping")} speed={speed} wide />
-      </div>
+      </div>}
       {run.mapping && <Note>Confirmed by {(run.mapping as { confirmed_by: string }).confirmed_by} · {run.records.length} canonical records · {(run.row_issues || []).length} validation issues</Note>}
     </StageCard>}
 
     {stage >= 2 && <StageCard key="review" index={2} title="Record review: model proposals and decisions" state={state(2)}>
-      <Note>{run.suggestions.length ? `${run.extraction_identity?.model_id || "Recorded model"} proposed spans for each row. Proposals stay unapproved until a decision is saved; the replay uses simulated attribution, not a human reviewer.` : "Replaying the recorded extraction…"}</Note>
+      <Note>{run.suggestions.length ? `${run.extraction_identity?.model_id || "Recorded model"} proposed spans for each row. Proposals stay unapproved until a decision is saved; the replay uses simulated attribution, not a human reviewer.` : extractForm ? "The recorded model proposals are ready to replay." : "Replaying the recorded extraction…"}</Note>
+      {extractForm}
       {!!run.suggestions.length && <ul className="space-y-2">{run.records.map(record => {
         const suggestion = run.suggestions.find(value => value.record_id === record.record_id);
         const decision = run.decisions[record.record_id];
@@ -359,17 +446,18 @@ function StageCards({ run, w, step, input, speed, typingNow, inspect, onSigned }
           <p>{record.text_norm}</p>
           {suggestion?.output ? <div className="flex flex-wrap gap-1.5">{suggestion.output.entities.map(entity => <span key={entity.id} className="rounded border border-line-strong px-1.5 py-0.5 text-xs"><span className="text-fg-4">{entity.type}</span> {entity.text}</span>)}</div>
             : <p className="text-xs text-danger">{suggestion?.errors.join("; ") || "No valid proposal"}. It cannot be accepted, so it is rejected.</p>}
-          {(decision || (current && step === "review")) && <ConsoleField label="Decision reason" value={decision?.reason || recordReason(status)} typing={current && typingNow("review")} speed={speed} />}
+          {(current && manualStep("review", "Your reason is saved; the decision is attributed to SYNTHETIC DEMO SIMULATOR so the recorded explanation still matches."))
+            || ((decision || (current && step === "review")) && <ConsoleField label="Decision reason" value={decision?.reason || recordReason(status)} typing={current && typingNow("review")} speed={speed} />)}
         </li>;
       })}</ul>}
     </StageCard>}
 
     {stage >= 3 && <StageCard key="facts" index={3} title="Facts: computed from approved records" state={state(3)}>
-      <div className="grid gap-3 sm:grid-cols-3">
+      {manualStep("analyze", "Set the supervisor criticality policy for this review.") || <div className="grid gap-3 sm:grid-cols-3">
         <ConsoleField label="Critical component" value={SCENARIO.criticality.component} typing={typingNow("analyze")} speed={speed} />
         <ConsoleField label="Criticality multiplier" value={String(SCENARIO.criticality.value)} typing={typingNow("analyze")} speed={speed} />
         <ConsoleField label="Criticality reason" value={SCENARIO.criticality.reason} typing={typingNow("analyze")} speed={speed} />
-      </div>
+      </div>}
       {run.snapshot && <>
         <Note>Snapshot <span className="font-mono">{run.snapshot.snapshot_id}</span> · {run.snapshot.entries.length} approved records. Priority is a rule-based historical ordering, not a failure probability.</Note>
         <div className="overflow-x-auto rounded-lg border border-line"><table className="w-full text-left text-sm">
@@ -386,11 +474,11 @@ function StageCards({ run, w, step, input, speed, typingNow, inspect, onSigned }
     </StageCard>}
 
     {stage >= 4 && <StageCard key="evidence" index={4} title="Evidence: applicable passages and cited explanation" state={state(4)}>
-      <div className="grid gap-3 sm:grid-cols-3">
+      {manualStep("context", "Scope the evidence search to the approved asset and component.") || <div className="grid gap-3 sm:grid-cols-3">
         <ConsoleField label="Evidence asset" value={assetOf(run)} typing={typingNow("context")} speed={speed} />
         <ConsoleField label="Evidence component" value={SCENARIO.component} typing={typingNow("context")} speed={speed} />
         <ConsoleField label="Evidence query" value={SCENARIO.query} typing={typingNow("context")} speed={speed} />
-      </div>
+      </div>}
       {run.context?.pack && <>
         <Note>{run.context.pack.passages.length} applicable passages from {run.context.corpus_mode} corpus {run.context.pack.corpus_version}. Sources off the reviewed asset path are excluded.</Note>
         {run.context.pack.passages.map(passage => <article key={passage.passage_id} className="space-y-1.5 rounded-lg border border-line p-3">
@@ -405,7 +493,7 @@ function StageCards({ run, w, step, input, speed, typingNow, inspect, onSigned }
         {!!draft.alternatives.length && <><h3 className="font-semibold">Alternatives</h3>{draft.alternatives.map((claim, index) => <ClaimView key={index} claim={claim} inspect={inspect} />)}</>}
         {draft.inspection && <><h3 className="font-semibold">Inspection guidance</h3><ClaimView claim={draft.inspection} inspect={inspect} /></>}
         <Note>{draft.uncertainty}</Note>
-      </div> : <Note>Replaying the recorded explanation for this evidence pack…</Note>)}
+      </div> : manualStep("generate", "The recorded cited explanation for this evidence pack is ready to replay.") || <Note>Replaying the recorded explanation for this evidence pack…</Note>)}
     </StageCard>}
 
     {stage >= 5 && draft && <StageCard key="expert" index={5} title="Expert signoff" state={state(5)}>
@@ -413,7 +501,7 @@ function StageCards({ run, w, step, input, speed, typingNow, inspect, onSigned }
     </StageCard>}
 
     {stage >= 5 && <StageCard key="report" index={6} title="Report" state={state(6)}>
-      <ReportView run={run} w={w} />
+      <ReportView run={run} w={w} issueForm={manualStep("issue", "The backend rechecks the signed snapshot, evidence pack and draft before rendering.")} />
     </StageCard>}
   </>;
 }
@@ -463,7 +551,7 @@ function ExpertSignoff({ run, w, draft, inspect, onSigned }: { run: Run; w: Cont
   </>;
 }
 
-function ReportView({ run, w }: { run: Run; w: Controller }) {
+function ReportView({ run, w, issueForm }: { run: Run; w: Controller; issueForm: ReactNode }) {
   const latest = run.expert_reviews.at(-1);
   const report = run.latest_report;
   const history = w.reports.filter(value => value.report_id !== report?.report_id);
@@ -474,7 +562,7 @@ function ReportView({ run, w }: { run: Run; w: Controller }) {
       <Badge t={tone}>Report blocked</Badge>
       <p className="text-sm text-fg-2">The finding was signed off as <span className="text-fg">{latest.decision}</span>, so no report can be issued for this snapshot. Choose another decision above to continue.</p>
     </div>}
-    {latest && ["accepted", "corrected"].includes(latest.decision) && !report && <Note>Rendering the PDF for the signed snapshot…</Note>}
+    {latest && ["accepted", "corrected"].includes(latest.decision) && !report && (issueForm || <Note>Rendering the PDF for the signed snapshot…</Note>)}
     {report && <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2"><Badge t="ok">Issued</Badge><Badge t="synthetic">Synthetic data · simulated signoff</Badge><span className="text-xs text-fg-4">Signed as {report.expert_review.decision}</span></div>
       <dl className="grid gap-2 text-sm sm:grid-cols-2">

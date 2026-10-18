@@ -152,6 +152,44 @@ test("@replay guided demo run plays to signoff, honours the expert decision and 
   expect(errors).toEqual([]);
 });
 
+test("@replay manual demo mode only accepts recorded values and reaches the issued PDF", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  const submit = async (name: string, fill = true) => {
+    if (fill) await page.getByRole("button", { name: "Fill recorded values", exact: true }).click();
+    const [response] = await Promise.all([page.waitForResponse(value => value.request().method() === "POST" && value.url().includes("/api/runs")),
+      page.getByRole("button", { name, exact: true }).click()]);
+    expect(response.status(), await response.text()).toBeLessThan(400);
+  };
+  await page.goto("/#/app");
+  await page.getByRole("button", { name: /^Fill it in yourself/ }).click();
+  await page.getByRole("textbox", { name: "Run name", exact: true }).fill("My manual run");
+  await page.getByRole("textbox", { name: "Operator", exact: true }).fill("someone-else");
+  await expect(page.getByText(/Another value would miss the replay/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open run", exact: true })).toBeDisabled();
+  await submit("Open run");
+  await submit("Upload recorded export", false);
+  await submit("Confirm mapping");
+  await submit("Start extraction", false);
+  await page.getByRole("combobox", { name: "Record decision", exact: true }).selectOption("rejected");
+  await expect(page.getByRole("button", { name: "Save record decision", exact: true })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Record decision reason", exact: true }).fill("Checked by hand in manual mode");
+  for (let index = 0; index < 6; index++) await submit("Save record decision");
+  await submit("Analyze approved records");
+  await submit("Retrieve evidence");
+  await submit("Generate explanation", false);
+  await submit("Sign off: accept finding", false);
+  await submit("Issue approved PDF", false);
+  await expect(page.getByRole("link", { name: "Download PDF", exact: true })).toBeVisible();
+  const id = await page.evaluate(() => localStorage.getItem("ignis-demo-run"));
+  const run: Run = await (await page.request.get(`/api/runs/${id}`)).json();
+  expect(run.name).toBe("My manual run");
+  expect(run.decisions[run.records[0].record_id].reason).toBe("Checked by hand in manual mode");
+  expect(run.draft_result?.status).toBe("pending_expert_review");
+  expect(run.latest_report?.expert_review.decision).toBe("accepted");
+  expect(errors).toEqual([]);
+});
+
 test("@mock-boundary stale revision refreshes state and does not repeat the mutation", async ({ page }) => {
   await page.goto("/#/app/manual");
   await page.getByRole("button", { name: "Load recorded demo input", exact: true }).click();
